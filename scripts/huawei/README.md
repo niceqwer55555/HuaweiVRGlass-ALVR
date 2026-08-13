@@ -11,14 +11,21 @@ pwsh -NoProfile -File .\scripts\huawei\build-android.ps1 -Configuration Release
 pwsh -NoProfile -File .\scripts\huawei\build-windows.ps1 -Configuration Release
 ```
 
-Android 脚本会校验并复制 HVRSDK OpenXR 3.5.0.79 官方 Demo 发布的应用侧 Loader，把官方 `hvrbridge.jar` 编译为 DEX 并注入、重新对齐和签名 APK，然后构建 32 位 ALVR 客户端。客户端会在进入 OpenXR 前调用 `LibUpdateClient.runUpdate()`，由手机已安装的 HUAWEI VR SDK Service 加载配套 Runtime/IPC 和 Java 框架；不再把服务 APK 的私有运行库捆进客户端。华为官方 Demo 与手机实际运行时都以 armeabi-v7a 为生产 ABI；服务 APK 内部 Loader 不作为第三方应用 Loader 使用。Windows 脚本会自动载入 Visual Studio x64 开发环境，并把中文字体许可证一起打包。
+Android 脚本会校验并复制 HVRSDK OpenXR 3.5.0.79 官方 Demo 发布的应用侧 Loader，把官方 `hvrbridge.jar` 编译为 DEX 并注入、重新对齐和签名 APK，然后构建 32 位 ALVR 客户端。客户端会在进入 OpenXR 前调用 `LibUpdateClient.runUpdate()`，由手机已安装的 HUAWEI VR SDK Service 加载配套 Runtime/IPC 和 Java 框架；不再把服务 APK 的私有运行库捆进客户端。华为官方 Demo 与手机实际运行时都以 armeabi-v7a 为生产 ABI；服务 APK 内部 Loader 不作为第三方应用 Loader 使用。
+
+Windows 脚本会自动载入 Visual Studio x64 开发环境、保留现有 `session.json` 并把中文字体许可证一起打包，因此重新编译不会清空受信任手机和已调好的华为串流参数。本机 `session.json`、旧配置和运行/崩溃日志会从发布 ZIP 中排除，不会把设备地址或信任记录带入分发包。只有确实需要恢复全新默认配置时才使用：
+
+```powershell
+pwsh -NoProfile -File .\scripts\huawei\build-windows.ps1 -Configuration Release -ResetConfiguration
+```
 
 ## 安装与连接
 
 1. 解压 Windows ZIP，运行 `ALVR Dashboard.exe`。
 2. 在“安装”页注册专版 ALVR 驱动；如存在无效旧驱动，可在同一页面移除。
-3. 在华为手机上安装 APK，通过 HUAWEI VR Glass 环境启动客户端。
-4. 确保手机和电脑位于同一局域网，在“设备”页信任客户端并启动 SteamVR。
+3. 新安装或配置被重置时，启动 SteamVR，再用 PowerShell 7 执行 `应用华为已验收配置.ps1`，然后从 Dashboard 重启一次 SteamVR。
+4. 在华为手机上安装 APK，通过 HUAWEI VR Glass 环境启动客户端。
+5. 确保手机和电脑位于同一局域网，在“设备”页信任客户端并启动 SteamVR。
 
 ## 跨版本说明
 
@@ -28,7 +35,7 @@ Android 脚本会校验并复制 HVRSDK OpenXR 3.5.0.79 官方 Demo 发布的应
 
 ## 当前验证状态
 
-- Android armeabi-v7a Release APK：正在按华为官方生产 ABI 构建和真机验证。
-- Windows x64 Release：已编译并打包。
+- Android armeabi-v7a Release APK：已通过构建、zipalign、APK v2/v3 签名和鸿蒙 4.2 真机安装验证。
+- Windows x64 Release：已完成中文专版构建和打包。
 - 中文界面：Dashboard 主界面、设置名称、选项、说明、提示和客户端状态页均已覆盖；SteamVR、驱动和游戏输出的原始诊断日志保持原文，便于排错和检索。
-- 真机运行：arm64、ARMv7 PBuffer 与 ARMv7 Window Surface 路径均已验证到 OpenXR 实例、OpenGL ES 上下文与控制器 ActionSpace，但服务 APK 内部 Loader 导出的双眼纹理均为 0；正在改用 SDK Demo 发布的 ARMv7 应用侧 Loader 验证交换链与大厅画面。
+- 真机串流：双眼画面、95° FOV、70 Hz、左右手柄独立 6DoF、Home 生命周期和解码 underflow 防蓝闪路径均已接通。当前佩戴验收档为 TCP、H.264、`896×896/眼`、14 Mbps、1 帧客户端缓冲、1 帧 PC 待发送队列和 FFE 关闭；用户确认画面清晰、延迟可以接受。

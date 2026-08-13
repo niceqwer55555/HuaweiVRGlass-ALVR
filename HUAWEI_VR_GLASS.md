@@ -25,8 +25,11 @@ Huawei 路径在解码器暂时没有交出新图像时会继续显示上一张�
 
 ```powershell
 pwsh -NoProfile -File .\scripts\huawei\build-android.ps1 -Configuration Release -SkipToolInstall
-pwsh -NoProfile -File .\scripts\huawei\build-windows.ps1 -Configuration Release -SkipToolInstall
+pwsh -NoProfile -File .\scripts\huawei\build-windows.ps1 -Configuration Release
 ```
+
+Windows 构建默认使用 ALVR `--keep-config` 保留现有 `session.json`；如需有意恢复默认配置，可为脚本传入 `-ResetConfiguration`。
+Windows ZIP 同时提供 `应用华为已验收配置.ps1`，用于在新安装或配置重置后一次恢复真机验收的清晰低延迟档。
 
 华为官方 SDK、签名文件、构建产物、设备日志和本机配置不会提交到 Git。构建脚本会从项目外部 SDK 目录读取已校验的 Huawei OpenXR Loader 和 `hvrbridge.jar`。
 
