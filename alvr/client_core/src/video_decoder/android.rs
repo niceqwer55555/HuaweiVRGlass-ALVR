@@ -151,6 +151,8 @@ pub struct VideoDecoderSource {
     image_queue: Arc<Mutex<VecDeque<QueuedImage>>>,
     config: VideoDecoderConfig,
     buffering_running_average: f32,
+    retained_frame: Option<QueuedImage>,
+    logged_retained_frame_reuse: bool,
 }
 
 unsafe impl Send for VideoDecoderSource {}
@@ -159,6 +161,28 @@ impl VideoDecoderSource {
     // The application MUST finish using the returned buffer before calling this function again
     pub fn dequeue_frame(&mut self) -> Option<(Duration, *mut c_void)> {
         let mut image_queue_lock = self.image_queue.lock();
+
+        if self.config.retain_last_frame {
+            self.buffering_running_average = self.buffering_running_average
+                * self.config.buffering_history_weight
+                + image_queue_lock.len() as f32 * (1. - self.config.buffering_history_weight);
+
+            if let Some(mut newest_frame) = image_queue_lock.pop_back() {
+                newest_frame.in_use = true;
+                image_queue_lock.clear();
+                self.retained_frame = Some(newest_frame);
+            } else if self.retained_frame.is_some() && !self.logged_retained_frame_reuse {
+                warn!("[HVR-DIAG] Reusing the last decoded frame during decoder underflow");
+                self.logged_retained_frame_reuse = true;
+            }
+
+            return self.retained_frame.as_mut().map(|frame| {
+                (
+                    frame.timestamp,
+                    frame.image.hardware_buffer().unwrap().as_ptr().cast(),
+                )
+            });
+        }
 
         if let Some(queued_image) = image_queue_lock.front() {
             if queued_image.in_use {
@@ -261,7 +285,7 @@ fn decoder_lifecycle(
 ) -> Result<()> {
     // 2x: keep the target buffering in the middle of the max amount of queuable frames
     let available_buffering_frames = (2. * config.max_buffering_frames).ceil() as usize;
-    let queue_capacity = if config.prefer_latest_frame {
+    let queue_capacity = if config.prefer_latest_frame || config.retain_last_frame {
         // acquireLatestImage needs at least two unacquired slots to discard stale frames.
         config.image_reader_max_images.saturating_sub(2).max(1)
     } else {
@@ -535,6 +559,8 @@ pub fn video_decoder_split(
         image_queue,
         config,
         buffering_running_average: 0.0,
+        retained_frame: None,
+        logged_retained_frame_reuse: false,
     };
 
     Ok((sink, source))

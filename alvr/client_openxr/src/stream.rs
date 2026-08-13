@@ -386,6 +386,7 @@ impl StreamContext {
             buffering_history_weight: self.config.buffering_history_weight,
             image_reader_max_images: 10,
             prefer_latest_frame: false,
+            retain_last_frame: self.platform.is_huawei(),
             render_output_immediately: false,
             configured_frame_size,
             options: self.config.decoder_options.clone(),
@@ -448,7 +449,9 @@ impl StreamContext {
         if let Some((_, source)) = &mut self.decoder {
             while frame_result.is_none() && Instant::now() < frame_poll_deadline {
                 frame_result = source.get_frame();
-                thread::sleep(Duration::from_micros(500));
+                if frame_result.is_none() {
+                    thread::sleep(Duration::from_micros(500));
+                }
             }
         }
 

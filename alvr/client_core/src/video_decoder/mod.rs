@@ -13,6 +13,7 @@ pub struct VideoDecoderConfig {
     pub buffering_history_weight: f32,
     pub image_reader_max_images: usize,
     pub prefer_latest_frame: bool,
+    pub retain_last_frame: bool,
     pub render_output_immediately: bool,
     pub configured_frame_size: Option<(u32, u32)>,
     pub options: Vec<(String, MediacodecProperty)>,

@@ -951,6 +951,7 @@ pub extern "C" fn alvr_create_decoder(config: AlvrDecoderConfig) {
         buffering_history_weight: config.buffering_history_weight,
         image_reader_max_images: 10,
         prefer_latest_frame: false,
+        retain_last_frame: false,
         render_output_immediately: false,
         configured_frame_size: None,
         options: if !config.options.is_null() {
