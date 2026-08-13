@@ -1,5 +1,7 @@
 #[cfg(target_os = "android")]
 mod huawei;
+#[cfg(target_os = "android")]
+mod huawei_lobby;
 mod lobby;
 mod staging;
 mod stream;

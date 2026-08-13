@@ -172,7 +172,11 @@ impl Lobby {
         #[cfg(target_os = "android")]
         let renderer = if platform.is_huawei() {
             let _ = swapchain_textures;
-            LobbyRendererBackend::Huawei(HuaweiFramebufferRenderer::new(gfx_ctx, view_resolution))
+            LobbyRendererBackend::Huawei(HuaweiFramebufferRenderer::new(
+                gfx_ctx,
+                view_resolution,
+                initial_hud_message,
+            ))
         } else {
             LobbyRendererBackend::Standard(LobbyRenderer::new(
                 gfx_ctx,
@@ -211,7 +215,7 @@ impl Lobby {
         match &self.renderer {
             LobbyRendererBackend::Standard(renderer) => renderer.update_hud_message(message),
             #[cfg(target_os = "android")]
-            LobbyRendererBackend::Huawei(_) => (),
+            LobbyRendererBackend::Huawei(renderer) => renderer.update_hud_message(message),
         }
     }
 

@@ -19,6 +19,10 @@ Huawei 路径在解码器暂时没有交出新图像时会继续显示上一张�
 
 华为旧 Runtime 的合成路径仍会出现 GPU 完成等待和错过显示时限；当前开发版已经把同一视频帧的 `AHardwareBuffer` 改为每帧只导入一次并供左右眼复用。用户已佩戴确认 `896×896/眼、14 Mbps` 档画面清晰且延迟可以接受，该配置作为当前已验收开发基线。
 
+客户端未连接电脑时会在眼镜内显示中文等待界面，并随连接状态更新提示。界面直接按 Huawei Runtime 推荐的 `1552×1552` 每眼分辨率栅格化，内容缩放为设计稿的 62%，不经过低分辨率中间图二次放大；纹理使用线性过滤，以改善小字号中文边缘。华为 acquire-bound 帧缓冲的原始方向保持不变，因此外接显示截图会呈双眼各旋转 90°，这是眼镜光学显示所需方向。
+
+手机桌面入口提供连接状态、手机局域网 IP、连接步骤和直接启动入口。“连接眼镜并进入 VR”调用 Huawei VR SDK 的官方 `com.huawei.android.vr.PROMPT` 2D 提示页；插入眼镜后由官方流程直接进入专用 VR Activity。实现依据华为官方的 [VR Engine 简介](https://developer.huawei.com/consumer/cn/doc/graphics-Guides/introduction-0000001144238265)、[配置 2D 提示页](https://developer.huawei.com/consumer/cn/doc/development/graphics-Guides/configuration-set-prompt-0000001205644943) 和 [Manifest 配置](https://developer.huawei.com/consumer/cn/doc/graphics-Guides/configuration-manifest-0000001205526407)。
+
 ## 构建
 
 环境和脚本说明见 [`scripts/huawei/README.md`](scripts/huawei/README.md)。
@@ -31,7 +35,7 @@ pwsh -NoProfile -File .\scripts\huawei\build-windows.ps1 -Configuration Release
 Windows 构建默认使用 ALVR `--keep-config` 保留现有 `session.json`；如需有意恢复默认配置，可为脚本传入 `-ResetConfiguration`。
 Windows ZIP 同时提供 `应用华为已验收配置.ps1`，用于在新安装或配置重置后一次恢复真机验收的清晰低延迟档。
 
-华为官方 SDK、签名文件、构建产物、设备日志和本机配置不会提交到 Git。构建脚本会从项目外部 SDK 目录读取已校验的 Huawei OpenXR Loader 和 `hvrbridge.jar`。
+华为官方 SDK、签名文件、构建产物、设备日志和本机配置不会提交到 Git。构建脚本会从项目外部 SDK 目录读取已校验的 Huawei OpenXR Loader、`hvrbridge.jar` 和官方 `hvrprompt.aar`。眼镜等待界面使用 Noto Sans CJK SC 子集字体，其许可文本保存在 `alvr/dashboard/resources/Noto-CJK-LICENSE.txt`。
 
 ## 调试连接
 

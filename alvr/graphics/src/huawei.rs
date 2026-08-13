@@ -1,9 +1,21 @@
 use super::{
-    ck, staging::create_program, GraphicsContext, ImportedHardwareBuffer, GL_TEXTURE_EXTERNAL_OES,
+    ck,
+    huawei_lobby::{render_huawei_lobby_texture, HUAWEI_LOBBY_TEXTURE_SIDE},
+    staging::create_program,
+    GraphicsContext, ImportedHardwareBuffer, GL_TEXTURE_EXTERNAL_OES,
 };
 use alvr_common::{glam::UVec2, info};
 use glow::{self as gl, HasContext};
-use std::{cell::Cell, ffi::c_void, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    ffi::c_void,
+    rc::Rc,
+};
+
+struct HuaweiLobbyResources {
+    program: gl::Program,
+    texture: gl::Texture,
+}
 
 /// Renderer for Huawei's legacy OpenXR runtime.
 ///
@@ -13,15 +25,91 @@ use std::{cell::Cell, ffi::c_void, rc::Rc};
 pub struct HuaweiFramebufferRenderer {
     context: Rc<GraphicsContext>,
     view_resolution: UVec2,
+    resources: RefCell<Option<HuaweiLobbyResources>>,
+    hud_message: RefCell<String>,
+    hud_dirty: Cell<bool>,
     logged_eyes: Cell<u8>,
 }
 
 impl HuaweiFramebufferRenderer {
-    pub fn new(context: Rc<GraphicsContext>, view_resolution: UVec2) -> Self {
+    pub fn new(
+        context: Rc<GraphicsContext>,
+        view_resolution: UVec2,
+        initial_hud_message: &str,
+    ) -> Self {
         Self {
             context,
             view_resolution,
+            resources: RefCell::new(None),
+            hud_message: RefCell::new(initial_hud_message.to_owned()),
+            hud_dirty: Cell::new(true),
             logged_eyes: Cell::new(0),
+        }
+    }
+
+    pub fn update_hud_message(&self, message: &str) {
+        let mut current_message = self.hud_message.borrow_mut();
+        if current_message.as_str() != message {
+            current_message.clear();
+            current_message.push_str(message);
+            self.hud_dirty.set(true);
+        }
+    }
+
+    fn ensure_resources(&self) {
+        if self.resources.borrow().is_some() {
+            return;
+        }
+
+        let gl = &self.context.gl_context;
+        let program = create_program(
+            gl,
+            include_str!("../resources/huawei_lobby_vertex.glsl"),
+            include_str!("../resources/huawei_lobby_fragment.glsl"),
+        );
+
+        unsafe {
+            let texture = ck!(gl.create_texture().unwrap());
+            ck!(gl.active_texture(gl::TEXTURE0));
+            ck!(gl.bind_texture(gl::TEXTURE_2D, Some(texture)));
+            ck!(gl.tex_parameter_i32(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32));
+            ck!(gl.tex_parameter_i32(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32));
+            ck!(gl.tex_parameter_i32(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::CLAMP_TO_EDGE as i32));
+            ck!(gl.tex_parameter_i32(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::CLAMP_TO_EDGE as i32));
+            ck!(gl.use_program(Some(program)));
+            let sampler = ck!(gl.get_uniform_location(program, "lobby_texture")).unwrap();
+            ck!(gl.uniform_1_i32(Some(&sampler), 0));
+
+            self.resources
+                .replace(Some(HuaweiLobbyResources { program, texture }));
+        }
+    }
+
+    fn update_texture_if_needed(&self) {
+        if !self.hud_dirty.replace(false) {
+            return;
+        }
+
+        let pixels = render_huawei_lobby_texture(&self.hud_message.borrow());
+        let gl = &self.context.gl_context;
+        let resources = self.resources.borrow();
+        let resources = resources.as_ref().unwrap();
+
+        unsafe {
+            ck!(gl.active_texture(gl::TEXTURE0));
+            ck!(gl.bind_texture(gl::TEXTURE_2D, Some(resources.texture)));
+            ck!(gl.pixel_store_i32(gl::UNPACK_ALIGNMENT, 1));
+            ck!(gl.tex_image_2d(
+                gl::TEXTURE_2D,
+                0,
+                gl::RGBA as i32,
+                HUAWEI_LOBBY_TEXTURE_SIDE as i32,
+                HUAWEI_LOBBY_TEXTURE_SIDE as i32,
+                0,
+                gl::RGBA,
+                gl::UNSIGNED_BYTE,
+                gl::PixelUnpackData::Slice(Some(&pixels)),
+            ));
         }
     }
 
@@ -40,8 +128,21 @@ impl HuaweiFramebufferRenderer {
                 self.view_resolution.y as i32,
             );
             gl.color_mask(true, true, true, true);
-            gl.clear_color(0.02, 0.24, 0.32, 1.0);
+            gl.clear_color(0.027, 0.078, 0.118, 1.0);
             gl.clear(gl::COLOR_BUFFER_BIT);
+
+            self.ensure_resources();
+            self.update_texture_if_needed();
+            let resources = self.resources.borrow();
+            let resources = resources.as_ref().unwrap();
+            gl.use_program(Some(resources.program));
+            gl.active_texture(gl::TEXTURE0);
+            gl.bind_texture(gl::TEXTURE_2D, Some(resources.texture));
+            gl.bind_sampler(0, None);
+            gl.disable(gl::DEPTH_TEST);
+            gl.disable(gl::CULL_FACE);
+            gl.disable(gl::BLEND);
+            gl.draw_arrays(gl::TRIANGLE_STRIP, 0, 4);
             gl.flush();
 
             let gl_error = gl.get_error();

@@ -11,7 +11,7 @@ pwsh -NoProfile -File .\scripts\huawei\build-android.ps1 -Configuration Release
 pwsh -NoProfile -File .\scripts\huawei\build-windows.ps1 -Configuration Release
 ```
 
-Android 脚本会校验并复制 HVRSDK OpenXR 3.5.0.79 官方 Demo 发布的应用侧 Loader，把官方 `hvrbridge.jar` 编译为 DEX 并注入、重新对齐和签名 APK，然后构建 32 位 ALVR 客户端。客户端会在进入 OpenXR 前调用 `LibUpdateClient.runUpdate()`，由手机已安装的 HUAWEI VR SDK Service 加载配套 Runtime/IPC 和 Java 框架；不再把服务 APK 的私有运行库捆进客户端。华为官方 Demo 与手机实际运行时都以 armeabi-v7a 为生产 ABI；服务 APK 内部 Loader 不作为第三方应用 Loader 使用。
+Android 脚本会校验并复制 HVRSDK OpenXR 3.5.0.79 官方 Demo 发布的应用侧 Loader，把官方 `hvrbridge.jar` 编译为 DEX，并合并 HUAWEI VR SDK 3.5 的官方 `hvrprompt.aar` 2D 连接提示资源，随后重新对齐和签名 APK。客户端会在进入 OpenXR 前调用 `LibUpdateClient.runUpdate()`，由手机已安装的 HUAWEI VR SDK Service 加载配套 Runtime/IPC 和 Java 框架；不再把服务 APK 的私有运行库捆进客户端。华为官方 Demo 与手机实际运行时都以 armeabi-v7a 为生产 ABI；服务 APK 内部 Loader 不作为第三方应用 Loader 使用。
 
 Windows 脚本会自动载入 Visual Studio x64 开发环境、保留现有 `session.json` 并把中文字体许可证一起打包，因此重新编译不会清空受信任手机和已调好的华为串流参数。本机 `session.json`、旧配置和运行/崩溃日志会从发布 ZIP 中排除，不会把设备地址或信任记录带入分发包。只有确实需要恢复全新默认配置时才使用：
 
@@ -24,8 +24,10 @@ pwsh -NoProfile -File .\scripts\huawei\build-windows.ps1 -Configuration Release 
 1. 解压 Windows ZIP，运行 `ALVR Dashboard.exe`。
 2. 在“安装”页注册专版 ALVR 驱动；如存在无效旧驱动，可在同一页面移除。
 3. 新安装或配置被重置时，启动 SteamVR，再用 PowerShell 7 执行 `应用华为已验收配置.ps1`，然后从 Dashboard 重启一次 SteamVR。
-4. 在华为手机上安装 APK，通过 HUAWEI VR Glass 环境启动客户端。
+4. 在华为手机上安装并打开 APK；点击“连接眼镜并进入 VR”进入华为官方连接提示，插入眼镜并完成空间确认。眼镜已经连接时也可以使用“直接启动”。
 5. 确保手机和电脑位于同一局域网，在“设备”页信任客户端并启动 SteamVR。
+
+未连接电脑时，眼镜端会显示中文状态等待界面。该界面按 `1552×1552` 原生纹理绘制，使用 62% 内容尺寸；为适配 Huawei VR Glass 的 acquire-bound 帧缓冲，外接显示截图中的左右眼画面保持各旋转 90°，不要根据桌面截图将其转正。
 
 ## 跨版本说明
 

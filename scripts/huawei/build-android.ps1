@@ -57,6 +57,13 @@ try {
         throw "华为 hvrbridge.jar 校验失败：期望 $expectedBridgeHash，实际 $actualBridgeHash"
     }
 
+    $promptAar = Join-Path $projectRoot 'sdk\vrsdk-3.5.0.68\unityPlugin_0930NewPackage\Plugins\Android\hvrprompt.aar'
+    $expectedPromptHash = 'C1DAA950A17AD27928E491130EBBAE67DEA426CC1C2495A6C5992D1FFA407F8A'
+    $actualPromptHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $promptAar).Hash
+    if ($actualPromptHash -ne $expectedPromptHash) {
+        throw "华为 hvrprompt.aar 校验失败：期望 $expectedPromptHash，实际 $actualPromptHash"
+    }
+
     $keystore = Join-Path $repoRoot 'build\alvr_client_android\debug.keystore'
     $nativeLibrary = Join-Path $repoRoot 'target\armv7-linux-androideabi\release\libalvr_client_openxr.so'
     $loaderLibrary = Join-Path $repoRoot 'deps\android_openxr\armeabi-v7a\libopenxr_loader_huawei.so'
@@ -64,6 +71,7 @@ try {
         -NativeLibrary $nativeLibrary `
         -LoaderLibrary $loaderLibrary `
         -BridgeJar $bridgeJar `
+        -PromptAar $promptAar `
         -OutputApk $sourceApk `
         -AndroidSdk $androidSdk `
         -JavaHome $javaHome `

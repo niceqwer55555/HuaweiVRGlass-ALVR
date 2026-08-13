@@ -35,8 +35,20 @@
         android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen">
 
         <meta-data android:name="com.huawei.android.vr.application.mode" android:value="vr_only" />
+        <meta-data android:name="com.huawei.android.vr.application.type" android:value="game" />
         <meta-data android:name="com.huawei.vr.application.freeDegree" android:value="6dof" />
         <meta-data android:name="android.max_aspect" android:value="2.1" />
+
+        <activity
+            android:name="com.lht.huaweivr.alvr.HuaweiVrLauncherActivity"
+            android:exported="true"
+            android:screenOrientation="portrait"
+            android:theme="@android:style/Theme.Material.Light.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
 
         <activity
             android:name="com.lht.huaweivr.alvr.HuaweiVrActivity"
@@ -45,11 +57,19 @@
             android:launchMode="singleTask"
             android:screenOrientation="landscape">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-            <intent-filter>
                 <action android:name="com.huawei.android.vr.action.MAIN" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name="com.huawei.vrlab.HVRModeActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:screenOrientation="portrait"
+            android:taskAffinity=":finishing">
+            <intent-filter>
+                <action android:name="com.huawei.android.vr.PROMPT" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>

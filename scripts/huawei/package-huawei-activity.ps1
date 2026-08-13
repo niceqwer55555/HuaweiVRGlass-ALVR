@@ -7,6 +7,8 @@ param(
     [Parameter(Mandatory)]
     [string]$BridgeJar,
     [Parameter(Mandatory)]
+    [string]$PromptAar,
+    [Parameter(Mandatory)]
     [string]$OutputApk,
     [Parameter(Mandatory)]
     [string]$AndroidSdk,
@@ -29,7 +31,7 @@ if (-not $resolvedWorkRoot.StartsWith($resolvedBuildRoot, [System.StringComparis
     throw "拒绝清理仓库 build 目录以外的路径：$resolvedWorkRoot"
 }
 
-foreach ($requiredFile in @($NativeLibrary, $LoaderLibrary, $BridgeJar, $Keystore)) {
+foreach ($requiredFile in @($NativeLibrary, $LoaderLibrary, $BridgeJar, $PromptAar, $Keystore)) {
     if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
         throw "缺少 Huawei Activity 打包输入：$requiredFile"
     }
@@ -38,7 +40,10 @@ foreach ($requiredFile in @($NativeLibrary, $LoaderLibrary, $BridgeJar, $Keystor
 $buildTools = Join-Path $AndroidSdk 'build-tools\34.0.0'
 $androidJar = Join-Path $AndroidSdk 'platforms\android-34\android.jar'
 $manifest = Join-Path $clientRoot 'android_huawei\AndroidManifest.xml'
-$javaSource = Join-Path $clientRoot 'android_huawei\src\com\lht\huaweivr\alvr\HuaweiVrActivity.java'
+$javaSources = @(
+    (Join-Path $clientRoot 'android_huawei\src\com\lht\huaweivr\alvr\HuaweiVrActivity.java'),
+    (Join-Path $clientRoot 'android_huawei\src\com\lht\huaweivr\alvr\HuaweiVrLauncherActivity.java')
+)
 $resources = Join-Path $clientRoot 'resources'
 
 if (Test-Path -LiteralPath $workRoot) {
@@ -50,26 +55,45 @@ $packageRoot = Join-Path $workRoot 'package'
 $nativeRoot = Join-Path $packageRoot 'lib\armeabi-v7a'
 New-Item -ItemType Directory -Path $classesRoot, $dexRoot, $nativeRoot -Force | Out-Null
 
+$promptRoot = Join-Path $workRoot 'hvrprompt'
+New-Item -ItemType Directory -Path $promptRoot -Force | Out-Null
+Copy-Item -LiteralPath $PromptAar -Destination (Join-Path $promptRoot 'hvrprompt.zip')
+Expand-Archive -LiteralPath (Join-Path $promptRoot 'hvrprompt.zip') -DestinationPath $promptRoot -Force
+$promptClasses = Join-Path $promptRoot 'classes.jar'
+
+$unsignedApk = Join-Path $workRoot 'alvr-huawei-activity-unsigned.apk'
+$alignedApk = Join-Path $workRoot 'alvr-huawei-activity-aligned.apk'
+$generatedSources = Join-Path $workRoot 'generated'
+New-Item -ItemType Directory -Path $generatedSources -Force | Out-Null
+& (Join-Path $buildTools 'aapt.exe') package `
+    -f `
+    -m `
+    -M $manifest `
+    -S $resources `
+    -S (Join-Path $promptRoot 'res') `
+    -I $androidJar `
+    --auto-add-overlay `
+    --extra-packages com.huawei.vrlab `
+    -J $generatedSources `
+    -F $unsignedApk
+
+$generatedJavaSources = @(Get-ChildItem -LiteralPath $generatedSources -Recurse -Filter '*.java' | Select-Object -ExpandProperty FullName)
+if ($generatedJavaSources.Count -eq 0) {
+    throw 'aapt 未生成 Android 资源绑定源码。'
+}
+
 & (Join-Path $JavaHome 'bin\javac.exe') `
     -encoding UTF-8 `
     -source 8 `
     -target 8 `
-    -classpath "$androidJar;$BridgeJar" `
+    -classpath "$androidJar;$BridgeJar;$promptClasses" `
     -d $classesRoot `
-    $javaSource
+    $javaSources `
+    $generatedJavaSources
 
 $activityJar = Join-Path $workRoot 'huawei-activity.jar'
 & (Join-Path $JavaHome 'bin\jar.exe') cf $activityJar -C $classesRoot .
-& (Join-Path $buildTools 'd8.bat') --min-api 26 --output $dexRoot $activityJar $BridgeJar
-
-$unsignedApk = Join-Path $workRoot 'alvr-huawei-activity-unsigned.apk'
-$alignedApk = Join-Path $workRoot 'alvr-huawei-activity-aligned.apk'
-& (Join-Path $buildTools 'aapt.exe') package `
-    -f `
-    -M $manifest `
-    -S $resources `
-    -I $androidJar `
-    -F $unsignedApk
+& (Join-Path $buildTools 'd8.bat') --min-api 26 --output $dexRoot $activityJar $BridgeJar $promptClasses
 
 Copy-Item -LiteralPath $NativeLibrary -Destination (Join-Path $nativeRoot 'libalvr_client_openxr.so')
 Copy-Item -LiteralPath $LoaderLibrary -Destination (Join-Path $nativeRoot 'libxr_loader.so')
