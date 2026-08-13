@@ -558,12 +558,10 @@ fn connection_pipeline(
 
         if client_protocol_id != alvr_common::protocol_id_u64() {
             warn!(
-                "Trusted client is incompatible! Expected protocol ID: {}, found: {}",
+                "Client protocol differs; HUAWEI edition will try the connection. Expected protocol ID: {}, found: {}",
                 alvr_common::protocol_id_u64(),
                 client_protocol_id,
             );
-
-            return Ok(());
         }
 
         streaming_capabilities
@@ -872,6 +870,7 @@ fn connection_pipeline(
     let video_send_thread = thread::spawn({
         let client_hostname = client_hostname.clone();
         move || {
+            let mut logged_video_send_count = 0_u8;
             while is_streaming(&client_hostname) {
                 let VideoPacket { header, payload } =
                     match video_channel_receiver.recv_timeout(STREAMING_RECV_TIMEOUT) {
@@ -885,7 +884,27 @@ fn connection_pipeline(
                 buffer
                     .get_range_mut(0, payload.len())
                     .copy_from_slice(&payload);
-                video_sender.send(buffer).ok();
+                let payload_len = payload.len();
+                match video_sender.send(buffer) {
+                    Ok(()) => {
+                        if logged_video_send_count < 12 {
+                            warn!(
+                                "[HVR-DIAG] Server video send #{}: bytes={}, idr={}, result=ok",
+                                logged_video_send_count + 1,
+                                payload_len,
+                                header.is_idr
+                            );
+                            logged_video_send_count += 1;
+                        }
+                    }
+                    Err(e) => {
+                        error!(
+                            "[HVR-DIAG] Server video send failed: bytes={}, idr={}, error={e}",
+                            payload_len, header.is_idr
+                        );
+                        return;
+                    }
+                }
             }
         }
     });

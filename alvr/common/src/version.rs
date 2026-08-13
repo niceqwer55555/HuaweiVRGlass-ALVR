@@ -39,12 +39,8 @@ pub fn protocol_id_u64() -> u64 {
 }
 
 // deprecated
-pub fn is_version_compatible(other_version: &Version) -> bool {
-    let protocol_string = if other_version.pre.is_empty() {
-        other_version.major.to_string()
-    } else {
-        format!("{}-{}", other_version.major, other_version.pre)
-    };
-
-    protocol_id_u64() == hash_string(&protocol_string)
+pub fn is_version_compatible(_other_version: &Version) -> bool {
+    // HUAWEI VR Glass edition: do not reject peers based only on their version string.
+    // Actual wire-format errors are still reported by the serializer/deserializer.
+    true
 }

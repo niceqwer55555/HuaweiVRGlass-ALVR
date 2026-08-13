@@ -949,6 +949,10 @@ pub extern "C" fn alvr_create_decoder(config: AlvrDecoderConfig) {
         force_software_decoder: config.force_software_decoder,
         max_buffering_frames: config.max_buffering_frames,
         buffering_history_weight: config.buffering_history_weight,
+        image_reader_max_images: 10,
+        prefer_latest_frame: false,
+        render_output_immediately: false,
+        configured_frame_size: None,
         options: if !config.options.is_null() {
             let options =
                 unsafe { slice::from_raw_parts(config.options, config.options_count as usize) };

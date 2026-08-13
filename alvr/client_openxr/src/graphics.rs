@@ -1,5 +1,7 @@
 use alvr_common::glam::UVec2;
 use alvr_graphics::GraphicsContext;
+#[cfg(target_os = "android")]
+use alvr_graphics::HuaweiEglContext;
 use alvr_session::ClientsidePostProcessingConfig;
 use openxr as xr;
 
@@ -15,6 +17,15 @@ pub fn session_create_info(ctx: &GraphicsContext) -> xr::opengles::SessionCreate
     }
     #[cfg(not(target_os = "android"))]
     unimplemented!()
+}
+
+#[cfg(target_os = "android")]
+pub fn huawei_session_create_info(ctx: &HuaweiEglContext) -> xr::opengles::SessionCreateInfo {
+    xr::opengles::SessionCreateInfo::Android {
+        display: ctx.display.as_ptr(),
+        config: ctx.config.as_ptr(),
+        context: ctx.context.as_ptr(),
+    }
 }
 
 pub fn swapchain_format(
@@ -35,9 +46,22 @@ pub fn create_swapchain(
     resolution: UVec2,
     format: u32,
     foveation: Option<&xr::FoveationProfileFB>,
+    make_graphics_context_current: bool,
 ) -> xr::Swapchain<xr::OpenGlEs> {
-    gfx_ctx.make_current();
+    if make_graphics_context_current {
+        gfx_ctx.make_current();
+    }
 
+    create_swapchain_for_current_context(session, resolution, format, foveation)
+}
+
+#[allow(unused_variables)]
+pub fn create_swapchain_for_current_context(
+    session: &xr::Session<xr::OpenGlEs>,
+    resolution: UVec2,
+    format: u32,
+    foveation: Option<&xr::FoveationProfileFB>,
+) -> xr::Swapchain<xr::OpenGlEs> {
     let swapchain_info = xr::SwapchainCreateInfo {
         create_flags: xr::SwapchainCreateFlags::EMPTY,
         usage_flags: xr::SwapchainUsageFlags::COLOR_ATTACHMENT | xr::SwapchainUsageFlags::SAMPLED,

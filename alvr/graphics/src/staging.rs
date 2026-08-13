@@ -4,7 +4,7 @@ use alvr_common::glam::{IVec2, UVec2};
 use glow::{self as gl, HasContext};
 use std::{ffi::c_void, rc::Rc};
 
-fn create_program(
+pub(super) fn create_program(
     gl: &gl::Context,
     vertex_shader_source: &str,
     fragment_shader_source: &str,

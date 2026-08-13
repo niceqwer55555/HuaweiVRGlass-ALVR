@@ -53,10 +53,7 @@ impl StatisticsTab {
                 self.draw_statistics_overview(ui, stats);
             });
         } else {
-            ui.heading(
-                "No statistics available. 
-            Start SteamVR and connect to a device to gather statistics",
-            );
+            ui.heading("暂无统计数据。\n请启动 SteamVR 并连接设备以开始采集。");
         }
 
         None
@@ -137,7 +134,7 @@ impl StatisticsTab {
         self.draw_graph(
             ui,
             available_width,
-            "Latency",
+            "延迟",
             0.0..=(data.quantile(UPPER_QUANTILE) * 1.2) as f32 * 1000.0,
             |painter, to_screen_trans| {
                 for i in 0..GRAPH_HISTORY_SIZE {
@@ -184,31 +181,26 @@ impl StatisticsTab {
 
                     label(
                         ui,
-                        "Motion to Photon Latency",
+                        "运动到画面延迟",
                         stats.total_pipeline_latency_s,
                         theme::FG,
                     );
-                    label(ui, "ALVR Latency", transmission_total_latency_s, theme::FG);
+                    label(ui, "ALVR 传输延迟", transmission_total_latency_s, theme::FG);
                     label(
                         ui,
-                        "Client System (not ALVR latency)",
+                        "客户端系统（不计入 ALVR 延迟）",
                         stats.vsync_queue_s,
                         RENDER_EXTERNAL_LABEL,
                     );
+                    label(ui, "客户端应用合成器", stats.client_compositor_s, RENDER);
+                    label(ui, "帧缓冲", stats.decoder_queue_s, IDLE);
+                    label(ui, "解码", stats.decoder_s, TRANSCODE);
+                    label(ui, "网络", stats.network_s, NETWORK);
+                    label(ui, "编码", stats.encoder_s, TRANSCODE);
+                    label(ui, "串流端合成器", stats.server_compositor_s, RENDER);
                     label(
                         ui,
-                        "Client App Compositor",
-                        stats.client_compositor_s,
-                        RENDER,
-                    );
-                    label(ui, "Frame Buffering", stats.decoder_queue_s, IDLE);
-                    label(ui, "Decode", stats.decoder_s, TRANSCODE);
-                    label(ui, "Network", stats.network_s, NETWORK);
-                    label(ui, "Encode", stats.encoder_s, TRANSCODE);
-                    label(ui, "Streamer Compositor", stats.server_compositor_s, RENDER);
-                    label(
-                        ui,
-                        "Game Render (not ALVR latency)",
+                        "游戏渲染（不计入 ALVR 延迟）",
                         stats.game_time_s,
                         RENDER_EXTERNAL_LABEL,
                     );
@@ -235,7 +227,7 @@ impl StatisticsTab {
         self.draw_graph(
             ui,
             available_width,
-            "Framerate",
+            "帧率",
             min as f32..=max as f32,
             |painter, to_screen_trans| {
                 let (server_fps_points, client_fps_points) = (0..GRAPH_HISTORY_SIZE)
@@ -258,8 +250,8 @@ impl StatisticsTab {
                         ui.end_row();
                     }
 
-                    label(ui, "Server FPS", stats.server_fps, graph_colors::SERVER_FPS);
-                    label(ui, "Client FPS", stats.client_fps, graph_colors::CLIENT_FPS);
+                    label(ui, "服务端帧率", stats.server_fps, graph_colors::SERVER_FPS);
+                    label(ui, "客户端帧率", stats.client_fps, graph_colors::CLIENT_FPS);
                 });
             },
         );
@@ -276,7 +268,7 @@ impl StatisticsTab {
         self.draw_graph(
             ui,
             available_width,
-            "Bitrate and Throughput",
+            "码率与吞吐量",
             0.0..=(data.quantile(UPPER_QUANTILE) * 1.2) as f32 / 1e6,
             |painter, to_screen_trans| {
                 let mut scaled_calculated = Vec::with_capacity(GRAPH_HISTORY_SIZE);
@@ -375,62 +367,62 @@ impl StatisticsTab {
 
                     maybe_label(
                         ui,
-                        "Initial calculated throughput",
+                        "初始计算吞吐量",
                         td.scaled_calculated_throughput_bps,
                         graph_colors::INITIAL_CALCULATED_THROUGHPUT,
                     );
                     maybe_label(
                         ui,
-                        "Encoder latency limiter",
+                        "编码延迟限制器",
                         td.encoder_latency_limiter_bps,
                         graph_colors::ENCODER_DECODER_LATENCY_LIMITER,
                     );
                     maybe_label(
                         ui,
-                        "Network latency limiter",
+                        "网络延迟限制器",
                         td.network_latency_limiter_bps,
                         graph_colors::NETWORK_LATENCY_LIMITER,
                     );
                     maybe_label(
                         ui,
-                        "Decoder latency limiter",
+                        "解码延迟限制器",
                         td.decoder_latency_limiter_bps
                             .filter(|l| *l < stats.throughput_bps),
                         graph_colors::ENCODER_DECODER_LATENCY_LIMITER,
                     );
                     maybe_label(
                         ui,
-                        "Manual max throughput",
+                        "手动最大吞吐量",
                         td.manual_max_throughput_bps,
                         graph_colors::MIN_MAX_LATENCY_THROUGHPUT,
                     );
                     maybe_label(
                         ui,
-                        "Manual min throughput",
+                        "手动最小吞吐量",
                         td.manual_min_throughput_bps,
                         graph_colors::MIN_MAX_LATENCY_THROUGHPUT,
                     );
                     maybe_label(
                         ui,
-                        "Requested bitrate",
+                        "请求码率",
                         Some(td.requested_bitrate_bps),
                         graph_colors::REQUESTED_BITRATE,
                     );
                     maybe_label(
                         ui,
-                        "Recorded throughput",
+                        "实际吞吐量",
                         Some(stats.throughput_bps),
                         graph_colors::RECORDED_THROUGHPUT,
                     );
                     maybe_label(
                         ui,
-                        "Recorded bitrate",
+                        "实际码率",
                         Some(stats.bitrate_bps),
                         graph_colors::RECORDED_BITRATE,
                     );
                 });
 
-                ui.small("Note: throughput is the peak bitrate, packet_size/network_latency.");
+                ui.small("说明：吞吐量为峰值码率，即 数据包大小/网络延迟。");
             },
         )
     }
@@ -439,50 +431,50 @@ impl StatisticsTab {
         ui.add_space(10.0);
 
         ui.columns(2, |ui| {
-            ui[0].label("Total packets:");
+            ui[0].label("数据包总数：");
             ui[1].label(format!(
-                "{} packets ({} packets/s)",
+                "{} 个（{} 个/秒）",
                 statistics.video_packets_total, statistics.video_packets_per_sec
             ));
 
-            ui[0].label("Total sent:");
+            ui[0].label("发送总量：");
             ui[1].label(format!("{} MB", statistics.video_mbytes_total));
 
-            ui[0].label("Bitrate:");
+            ui[0].label("码率：");
             ui[1].label(format!("{:.1} Mbps", statistics.video_mbits_per_sec));
 
-            ui[0].label("Total latency:");
+            ui[0].label("总延迟：");
             ui[1].label(format!("{:.0} ms", statistics.total_latency_ms));
 
-            ui[0].label("Encoder latency:");
+            ui[0].label("编码延迟：");
             ui[1].label(format!("{:.2} ms", statistics.encode_latency_ms));
 
-            ui[0].label("Transport latency:");
+            ui[0].label("传输延迟：");
             ui[1].label(format!("{:.2} ms", statistics.network_latency_ms));
 
-            ui[0].label("Decoder latency:");
+            ui[0].label("解码延迟：");
             ui[1].label(format!("{:.2} ms", statistics.decode_latency_ms));
 
-            ui[0].label("Total packets lost:");
+            ui[0].label("丢包总数：");
             ui[1].label(format!(
-                "{} packets ({} packets/s)",
+                "{} 个（{} 个/秒）",
                 statistics.packets_lost_total, statistics.packets_lost_per_sec
             ));
 
-            ui[0].label("Client FPS:");
+            ui[0].label("客户端帧率：");
             ui[1].label(format!("{} FPS", statistics.client_fps));
 
-            ui[0].label("Streamer FPS:");
+            ui[0].label("串流端帧率：");
             ui[1].label(format!("{} FPS", statistics.server_fps));
 
-            ui[0].label("Headset battery");
+            ui[0].label("头显电量：");
             ui[1].label(format!(
                 "{}% ({})",
                 statistics.battery_hmd,
                 if statistics.hmd_plugged {
-                    "plugged"
+                    "充电中"
                 } else {
-                    "unplugged"
+                    "未充电"
                 }
             ));
         });

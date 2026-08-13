@@ -84,10 +84,12 @@ impl ClientCoreContext {
     pub fn new(capabilities: ClientCapabilities) -> Self {
         dbg_client_core!("Create");
 
-        // Make sure to reset config in case of version compat mismatch.
-        if Config::load().protocol_id != alvr_common::protocol_id() {
-            // NB: Config::default() sets the current protocol ID
-            Config::default().store();
+        // Preserve user configuration across client versions. The protocol marker is kept only for
+        // diagnostics; the HUAWEI edition does not treat it as a connection gate.
+        let mut config = Config::load();
+        if config.protocol_id != alvr_common::protocol_id() {
+            config.protocol_id = alvr_common::protocol_id();
+            config.store();
         }
 
         #[cfg(target_os = "android")]

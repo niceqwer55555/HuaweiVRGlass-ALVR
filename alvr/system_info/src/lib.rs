@@ -35,6 +35,7 @@ pub enum Platform {
     Yvr,
     PlayForDreamMR,
     Lynx,
+    HuaweiVrGlass,
     AndroidUnknown,
     AppleHeadset,
     WindowsPc,
@@ -79,6 +80,10 @@ impl Platform {
     pub const fn is_yvr(&self) -> bool {
         matches!(self, Platform::Yvr | Platform::PlayForDreamMR)
     }
+
+    pub const fn is_huawei(&self) -> bool {
+        matches!(self, Platform::HuaweiVrGlass)
+    }
 }
 
 impl Display for Platform {
@@ -104,6 +109,7 @@ impl Display for Platform {
             Platform::Yvr => "YVR",
             Platform::PlayForDreamMR => "Play For Dream MR",
             Platform::Lynx => "Lynx Headset",
+            Platform::HuaweiVrGlass => "HUAWEI VR Glass",
             Platform::AndroidUnknown => "Android (unknown)",
             Platform::AppleHeadset => "Apple Headset",
             Platform::WindowsPc => "Windows PC",
@@ -153,6 +159,12 @@ pub fn platform() -> Platform {
             ("YVR", _, _, _) => Platform::Yvr,
             ("Play For Dream", _, _, _) => Platform::PlayForDreamMR,
             ("Lynx Mixed Reality", _, _, _) => Platform::Lynx,
+            (manufacturer, _, _, _)
+                if manufacturer.eq_ignore_ascii_case("HUAWEI")
+                    || manufacturer.eq_ignore_ascii_case("HONOR") =>
+            {
+                Platform::HuaweiVrGlass
+            }
             _ => Platform::AndroidUnknown,
         }
     }

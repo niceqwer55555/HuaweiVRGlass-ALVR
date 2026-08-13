@@ -11,6 +11,7 @@ crate-type = ["rlib", "staticlib", "cdylib"]
 
 [features]
 link-stdcpp-shared = []
+huawei-vr-gles = []
 default = ["link-stdcpp-shared"]
 
 [dependencies]

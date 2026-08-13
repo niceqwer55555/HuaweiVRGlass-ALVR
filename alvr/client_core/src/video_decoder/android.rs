@@ -42,6 +42,9 @@ type SharedMediaCodec = Arc<FakeThreadSafe<MediaCodec>>;
 
 pub struct VideoDecoderSink {
     inner: Arc<Mutex<Option<SharedMediaCodec>>>,
+    codec: CodecType,
+    logged_input_count: u8,
+    logged_input_saturation: bool,
 }
 
 unsafe impl Send for VideoDecoderSink {}
@@ -56,6 +59,29 @@ impl VideoDecoderSink {
 
         match decoder.dequeue_input_buffer(Duration::ZERO) {
             Ok(DequeuedInputBufferResult::Buffer(mut buffer)) => {
+                let buffer_capacity = buffer.buffer_mut().len();
+                if data.len() > buffer_capacity {
+                    error!(
+                        "Decoder input is too large: data={}, capacity={buffer_capacity}",
+                        data.len()
+                    );
+                    return Ok(false);
+                }
+
+                if self.logged_input_count < 12 {
+                    let nal_types = if self.codec == CodecType::H264 {
+                        annex_b_nal_types(data)
+                    } else {
+                        vec![]
+                    };
+                    warn!(
+                        "[HVR-DIAG] Decoder input #{}: bytes={}, capacity={buffer_capacity}, nal_types={nal_types:?}",
+                        self.logged_input_count + 1,
+                        data.len()
+                    );
+                    self.logged_input_count += 1;
+                }
+
                 unsafe {
                     ptr::copy_nonoverlapping(
                         data.as_ptr(),
@@ -71,10 +97,44 @@ impl VideoDecoderSink {
 
                 Ok(true)
             }
-            Ok(DequeuedInputBufferResult::TryAgainLater) => Ok(false),
+            Ok(DequeuedInputBufferResult::TryAgainLater) => {
+                if !self.logged_input_saturation {
+                    warn!("[HVR-DIAG] Decoder input queue saturated before first free buffer");
+                    self.logged_input_saturation = true;
+                }
+                Ok(false)
+            }
             Err(e) => bail!("{e}"),
         }
     }
+}
+
+fn annex_b_nal_types(data: &[u8]) -> Vec<u8> {
+    let mut nal_types = Vec::new();
+    let mut index = 0;
+
+    while index + 3 < data.len() {
+        let nal_index = if data[index..].starts_with(&[0, 0, 0, 1]) {
+            Some(index + 4)
+        } else if data[index..].starts_with(&[0, 0, 1]) {
+            Some(index + 3)
+        } else {
+            None
+        };
+
+        if let Some(nal_index) = nal_index {
+            if let Some(header) = data.get(nal_index) {
+                let nal_type = header & 0x1f;
+                if !nal_types.contains(&nal_type) {
+                    nal_types.push(nal_type);
+                }
+            }
+        }
+
+        index += 1;
+    }
+
+    nal_types
 }
 
 struct QueuedImage {
@@ -201,20 +261,41 @@ fn decoder_lifecycle(
 ) -> Result<()> {
     // 2x: keep the target buffering in the middle of the max amount of queuable frames
     let available_buffering_frames = (2. * config.max_buffering_frames).ceil() as usize;
+    let queue_capacity = if config.prefer_latest_frame {
+        // acquireLatestImage needs at least two unacquired slots to discard stale frames.
+        config.image_reader_max_images.saturating_sub(2).max(1)
+    } else {
+        available_buffering_frames
+    };
 
     image_reader.set_image_listener(Box::new({
         let image_queue = Arc::clone(&image_queue);
+        let logged_first_image = Arc::new(RelaxedAtomic::new(false));
         move |image_reader| {
             let mut image_queue_lock = image_queue.lock();
 
-            if image_queue_lock.len() > available_buffering_frames {
+            while image_queue_lock.len() >= queue_capacity {
                 warn!("Video frame queue overflow!");
                 image_queue_lock.pop_front();
             }
 
-            match image_reader.acquire_next_image() {
+            let acquire_result = if config.prefer_latest_frame {
+                image_reader.acquire_latest_image()
+            } else {
+                image_reader.acquire_next_image()
+            };
+            match acquire_result {
                 Ok(AcquireResult::Image(image)) => {
                     let timestamp = Duration::from_nanos(image.timestamp().unwrap() as u64);
+
+                    if !logged_first_image.value() {
+                        info!(
+                            "[HVR-DIAG] ImageReader acquired first frame: timestamp_ns={}, hardware_buffer={}",
+                            timestamp.as_nanos(),
+                            image.hardware_buffer().is_ok()
+                        );
+                        logged_first_image.set(true);
+                    }
 
                     if let Some(callback) = frame_result_callback.upgrade() {
                         callback(Ok(timestamp));
@@ -248,10 +329,23 @@ fn decoder_lifecycle(
 
     let mut format = MediaFormat::new();
     format.set_str("mime", mime);
-    // Given https://github.com/alvr-org/ALVR/pull/1933#discussion_r1431902906 - change at own risk.
-    // It might be harmless, it might not be, but it's definitely a risk.
-    format.set_i32("width", 512);
-    format.set_i32("height", 1024);
+    if let Some((width, height)) = config.configured_frame_size {
+        let width = width as i32;
+        let height = height as i32;
+
+        // Huawei's Android 10 C2 decoder fails while reconnecting its output Surface when the
+        // dummy 512x1024 format changes to the real stream size. Configure the negotiated encoded
+        // size up front and make the buffer-pool limit explicit so no dynamic resize is required.
+        format.set_i32("width", width);
+        format.set_i32("height", height);
+        format.set_i32("max-width", width);
+        format.set_i32("max-height", height);
+    } else {
+        // Given https://github.com/alvr-org/ALVR/pull/1933#discussion_r1431902906 - change at own risk.
+        // It might be harmless, it might not be, but it's definitely a risk.
+        format.set_i32("width", 512);
+        format.set_i32("height", 1024);
+    }
     format.set_buffer("csd-0", &csd_0);
 
     for (key, prop) in &config.options {
@@ -308,14 +402,28 @@ fn decoder_lifecycle(
     }
 
     let mut error_counter = 0;
+    let mut logged_first_output_buffer = false;
     while running.value() {
         match decoder.dequeue_output_buffer(Duration::from_millis(1)) {
             Ok(DequeuedOutputBufferInfoResult::Buffer(buffer)) => {
                 // The buffer timestamp is actually nanoseconds
                 let presentation_time_ns = buffer.info().presentation_time_us();
 
-                if let Err(e) = decoder.release_output_buffer_at_time(buffer, presentation_time_ns)
-                {
+                if !logged_first_output_buffer {
+                    warn!(
+                        "[HVR-DIAG] Decoder produced first output buffer: timestamp_ns={}, immediate_render={}",
+                        presentation_time_ns, config.render_output_immediately
+                    );
+                    logged_first_output_buffer = true;
+                }
+
+                let release_result = if config.render_output_immediately {
+                    decoder.release_output_buffer(buffer, true)
+                } else {
+                    decoder.release_output_buffer_at_time(buffer, presentation_time_ns)
+                };
+
+                if let Err(e) = release_result {
                     error!("Decoder dequeue error: {e}");
                 }
             }
@@ -365,13 +473,16 @@ pub fn video_decoder_split(
         let decoder_ready_notifier = Arc::clone(&decoder_ready_notifier);
         let image_queue = Arc::clone(&image_queue);
         move || {
-            const MAX_BUFFERING_FRAMES: usize = 10;
+            info!(
+                "[HVR-DIAG] Creating adaptive decoder ImageReader: 1x1, max_images={}",
+                config.image_reader_max_images
+            );
             let mut image_reader = match ImageReader::new_with_usage(
                 1,
                 1,
                 ImageFormat::PRIVATE,
                 HardwareBufferUsage::GPU_SAMPLED_IMAGE,
-                MAX_BUFFERING_FRAMES as i32,
+                config.image_reader_max_images as i32,
             ) {
                 Ok(reader) => reader,
                 Err(e) => {
@@ -414,6 +525,9 @@ pub fn video_decoder_split(
 
     let sink = VideoDecoderSink {
         inner: decoder_sink,
+        codec: config.codec,
+        logged_input_count: 0,
+        logged_input_saturation: false,
     };
     let source = VideoDecoderSource {
         running,

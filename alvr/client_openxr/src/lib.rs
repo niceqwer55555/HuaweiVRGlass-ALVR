@@ -1,6 +1,10 @@
 mod c_api;
 mod extra_extensions;
 mod graphics;
+#[cfg(target_os = "android")]
+mod huawei_activity;
+#[cfg(target_os = "android")]
+mod huawei_runtime;
 mod interaction;
 mod lobby;
 mod passthrough;
@@ -16,7 +20,7 @@ use alvr_common::{
     parking_lot::RwLock,
     Fov, Pose, HAND_LEFT_ID,
 };
-use alvr_graphics::GraphicsContext;
+use alvr_graphics::{GraphicsContext, SDR_FORMAT_GL};
 use alvr_session::{BodyTrackingBDConfig, BodyTrackingSourcesConfig};
 use alvr_system_info::Platform;
 use extra_extensions::{
@@ -28,8 +32,18 @@ use interaction::{InteractionContext, InteractionSourcesConfig};
 use lobby::Lobby;
 use openxr as xr;
 use passthrough::PassthroughLayer;
-use std::{path::Path, rc::Rc, sync::Arc, thread, time::Duration};
+#[cfg(target_os = "android")]
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::{ffi::c_void, path::Path, rc::Rc, sync::Arc, thread, time::Duration};
 use stream::StreamContext;
+
+#[cfg(target_os = "android")]
+static HUAWEI_EXIT_REQUESTED: AtomicBool = AtomicBool::new(false);
+
+#[cfg(target_os = "android")]
+fn request_huawei_exit() {
+    HUAWEI_EXIT_REQUESTED.store(true, Ordering::Release);
+}
 
 fn from_xr_vec3(v: xr::Vector3f) -> Vec3 {
     Vec3::new(v.x, v.y, v.z)
@@ -133,30 +147,85 @@ fn create_session(
     }
 }
 
+#[cfg(target_os = "android")]
+fn create_huawei_session(
+    xr_instance: &xr::Instance,
+    xr_system: xr::SystemId,
+    graphics_context: &alvr_graphics::HuaweiEglContext,
+) -> (
+    xr::Session<xr::OpenGlEs>,
+    xr::FrameWaiter,
+    xr::FrameStream<xr::OpenGlEs>,
+) {
+    graphics_context.make_current();
+    unsafe {
+        xr_instance
+            .create_session(
+                xr_system,
+                &graphics::huawei_session_create_info(graphics_context),
+            )
+            .unwrap()
+    }
+}
+
 pub fn entry_point() {
+    entry_point_with_window(None);
+}
+
+fn entry_point_with_window(_huawei_native_window: Option<*mut c_void>) {
     alvr_client_core::init_logging();
+    info!("[HVR-DIAG] entered OpenXR entry point");
 
     let platform = alvr_system_info::platform();
+    info!("[HVR-DIAG] detected platform: {platform}");
 
-    let loader_suffix = match platform {
-        Platform::Quest1 => "_quest1",
-        Platform::PicoNeo3
-        | Platform::PicoG3
-        | Platform::Pico4
-        | Platform::Pico4Pro
-        | Platform::Pico4Enterprise => "_pico_old",
-        p if p.is_yvr() => "_yvr",
-        Platform::Lynx => "_lynx",
-        _ => "",
+    let loader_filename = match platform {
+        Platform::HuaweiVrGlass => "libxr_loader.so".to_owned(),
+        platform => {
+            let suffix = match platform {
+                Platform::Quest1 => "_quest1",
+                Platform::PicoNeo3
+                | Platform::PicoG3
+                | Platform::Pico4
+                | Platform::Pico4Pro
+                | Platform::Pico4Enterprise => "_pico_old",
+                p if p.is_yvr() => "_yvr",
+                Platform::Lynx => "_lynx",
+                _ => "",
+            };
+            format!("libopenxr_loader{suffix}.so")
+        }
     };
-    let xr_entry = unsafe {
-        xr::Entry::load_from(Path::new(&format!("libopenxr_loader{loader_suffix}.so"))).unwrap()
+    #[cfg(target_os = "android")]
+    let xr_entry = if platform.is_huawei() {
+        info!("[HVR-DIAG] using directly linked OpenXR library: {loader_filename}");
+        xr::Entry::linked()
+    } else {
+        info!("[HVR-DIAG] loading OpenXR library: {loader_filename}");
+        unsafe { xr::Entry::load_from(Path::new(&loader_filename)).unwrap() }
     };
+
+    #[cfg(not(target_os = "android"))]
+    let xr_entry = {
+        info!("[HVR-DIAG] loading OpenXR library: {loader_filename}");
+        unsafe { xr::Entry::load_from(Path::new(&loader_filename)).unwrap() }
+    };
+
+    info!("[HVR-DIAG] OpenXR library ready");
 
     #[cfg(target_os = "android")]
-    xr_entry.initialize_android_loader().unwrap();
+    if !platform.is_huawei() {
+        xr_entry.initialize_android_loader().unwrap();
+    }
 
-    let available_extensions = xr_entry.enumerate_extensions().unwrap();
+    info!("[HVR-DIAG] enumerating OpenXR extensions");
+    let available_extensions = match xr_entry.enumerate_extensions() {
+        Ok(extensions) => extensions,
+        Err(error) => {
+            error!("[HVR-DIAG] failed to enumerate OpenXR extensions: {error:?}");
+            return;
+        }
+    };
     alvr_common::info!("OpenXR available extensions: {available_extensions:#?}");
 
     // todo: switch to vulkan
@@ -185,7 +254,7 @@ pub fn entry_point() {
     {
         exts.khr_android_create_instance = true;
     }
-    exts.khr_convert_timespec_time = true;
+    exts.khr_convert_timespec_time = available_extensions.khr_convert_timespec_time;
     exts.khr_opengl_es_enable = true;
     exts.other = available_extensions
         .other
@@ -203,38 +272,157 @@ pub fn entry_point() {
         })
         .collect();
 
-    let available_layers = xr_entry.enumerate_layers().unwrap();
+    info!("[HVR-DIAG] enumerating OpenXR API layers");
+    let available_layers = match xr_entry.enumerate_layers() {
+        Ok(layers) => layers,
+        Err(error) => {
+            error!("[HVR-DIAG] failed to enumerate OpenXR API layers: {error:?}");
+            return;
+        }
+    };
     alvr_common::info!("OpenXR available layers: {available_layers:#?}");
 
-    let xr_instance = xr_entry
-        .create_instance(
-            &xr::ApplicationInfo {
-                application_name: "ALVR Client",
-                application_version: 0,
-                engine_name: "ALVR",
-                engine_version: 0,
-            },
-            &exts,
-            &[],
-        )
-        .unwrap();
+    if platform.is_huawei() {
+        info!("[HVR-DIAG] creating OpenXR instance with API version 1.0.3");
+    } else {
+        info!(
+            "[HVR-DIAG] creating OpenXR instance with API version {}",
+            xr::CURRENT_API_VERSION
+        );
+    }
+    let application_info = if platform.is_huawei() {
+        xr::ApplicationInfo {
+            application_name: "HelloXR",
+            application_version: 0,
+            engine_name: "",
+            engine_version: 0,
+        }
+    } else {
+        xr::ApplicationInfo {
+            application_name: "ALVR Client",
+            application_version: 0,
+            engine_name: "ALVR",
+            engine_version: 0,
+        }
+    };
+    let xr_instance = match xr_entry.create_instance(&application_info, &exts, &[]) {
+        Ok(instance) => instance,
+        Err(error) => {
+            error!("[HVR-DIAG] failed to create OpenXR instance: {error:?}");
+            return;
+        }
+    };
+    info!("[HVR-DIAG] OpenXR instance created");
 
-    let graphics_context = Rc::new(GraphicsContext::new_gl());
+    // Huawei's official demo queries the mandatory GLES requirements before it initializes EGL.
+    // The legacy runtime uses this call to prepare the graphics path for the later context binding.
+    let huawei_xr_system = if platform.is_huawei() {
+        let instance_properties = xr_instance.properties().unwrap();
+        info!("[HVR-DIAG] Huawei instance properties: {instance_properties:?}");
+
+        let xr_system = xr_instance
+            .system(xr::FormFactor::HEAD_MOUNTED_DISPLAY)
+            .unwrap();
+        let system_properties = xr_instance.system_properties(xr_system).unwrap();
+        let view_configuration_types = xr_instance
+            .enumerate_view_configurations(xr_system)
+            .unwrap();
+        let stereo_properties = xr_instance
+            .view_configuration_properties(xr_system, xr::ViewConfigurationType::PRIMARY_STEREO)
+            .unwrap();
+        let stereo_views = xr_instance
+            .enumerate_view_configuration_views(
+                xr_system,
+                xr::ViewConfigurationType::PRIMARY_STEREO,
+            )
+            .unwrap();
+        let blend_modes = xr_instance
+            .enumerate_environment_blend_modes(xr_system, xr::ViewConfigurationType::PRIMARY_STEREO)
+            .unwrap();
+        info!("[HVR-DIAG] Huawei system properties: {system_properties:?}");
+        info!(
+            "[HVR-DIAG] Huawei pre-session view configuration: types={view_configuration_types:?}, stereo={stereo_properties:?}, views={stereo_views:?}, blend_modes={blend_modes:?}"
+        );
+
+        let requirements = xr_instance
+            .graphics_requirements::<xr::OpenGlEs>(xr_system)
+            .unwrap();
+        info!(
+            "[HVR-DIAG] Huawei GLES requirements queried before EGL: min={:?}, max={:?}",
+            requirements.min_api_version_supported, requirements.max_api_version_supported
+        );
+        Some(xr_system)
+    } else {
+        None
+    };
+
+    #[cfg(target_os = "android")]
+    let mut huawei_egl = platform.is_huawei().then(|| {
+        info!("[HVR-DIAG] creating official-first Huawei EGL context before wgpu");
+        alvr_graphics::HuaweiEglContext::new(
+            _huawei_native_window.expect("Huawei VR requires an Android native window"),
+        )
+    });
+
+    #[cfg(target_os = "android")]
+    let mut graphics_context_slot: Option<Rc<GraphicsContext>> = if platform.is_huawei() {
+        None
+    } else {
+        info!("[HVR-DIAG] creating OpenGL ES graphics context");
+        Some(Rc::new(GraphicsContext::new_gl()))
+    };
+
+    #[cfg(not(target_os = "android"))]
+    let mut graphics_context_slot: Option<Rc<GraphicsContext>> = {
+        info!("[HVR-DIAG] creating OpenGL ES graphics context");
+        Some(Rc::new(GraphicsContext::new_gl()))
+    };
 
     let mut last_lobby_message = String::new();
 
     'session_loop: loop {
-        let xr_system = xr_instance
-            .system(xr::FormFactor::HEAD_MOUNTED_DISPLAY)
-            .unwrap();
+        let xr_system = huawei_xr_system.unwrap_or_else(|| {
+            xr_instance
+                .system(xr::FormFactor::HEAD_MOUNTED_DISPLAY)
+                .unwrap()
+        });
 
         // mandatory call
-        let _ = xr_instance
-            .graphics_requirements::<xr::OpenGlEs>(xr_system)
-            .unwrap();
+        if !platform.is_huawei() {
+            let _ = xr_instance
+                .graphics_requirements::<xr::OpenGlEs>(xr_system)
+                .unwrap();
+        }
 
-        let (xr_session, mut xr_frame_waiter, mut xr_frame_stream) =
-            create_session(&xr_instance, xr_system, &graphics_context);
+        let huawei_official_first = platform.is_huawei() && graphics_context_slot.is_none();
+
+        if platform.is_huawei() && !huawei_official_first {
+            graphics_context_slot.as_ref().unwrap().make_current();
+            #[cfg(target_os = "android")]
+            graphics_context_slot
+                .as_ref()
+                .unwrap()
+                .log_current_egl("before xrCreateSession");
+        }
+
+        #[cfg(target_os = "android")]
+        let (xr_session, mut xr_frame_waiter, mut xr_frame_stream) = if huawei_official_first {
+            info!("[HVR-DIAG] creating Huawei OpenXR Session before any wgpu initialization");
+            create_huawei_session(&xr_instance, xr_system, huawei_egl.as_ref().unwrap())
+        } else {
+            create_session(
+                &xr_instance,
+                xr_system,
+                graphics_context_slot.as_ref().unwrap(),
+            )
+        };
+
+        #[cfg(not(target_os = "android"))]
+        let (xr_session, mut xr_frame_waiter, mut xr_frame_stream) = create_session(
+            &xr_instance,
+            xr_system,
+            graphics_context_slot.as_ref().unwrap(),
+        );
 
         let views_config = xr_instance
             .enumerate_view_configuration_views(
@@ -248,8 +436,68 @@ pub fn entry_point() {
             views_config[0].recommended_image_rect_width,
             views_config[0].recommended_image_rect_height,
         );
+        info!(
+            "[HVR-DIAG] primary stereo view resolution: {}x{}",
+            default_view_resolution.x, default_view_resolution.y
+        );
 
-        let refresh_rates = if exts.fb_display_refresh_rate {
+        let huawei_lobby_swapchains = if platform.is_huawei() {
+            #[cfg(target_os = "android")]
+            if huawei_official_first {
+                huawei_egl.as_ref().unwrap().make_current();
+            } else {
+                graphics_context_slot.as_ref().unwrap().make_current();
+            }
+            let formats = xr_session.enumerate_swapchain_formats().unwrap();
+            info!(
+                "[HVR-DIAG] Huawei swapchain formats enumerated before interaction setup: {formats:?}"
+            );
+            assert!(
+                formats.contains(&SDR_FORMAT_GL),
+                "Huawei runtime does not advertise the required GL_RGBA8 swapchain format"
+            );
+            #[cfg(target_os = "android")]
+            {
+                if huawei_official_first {
+                    Some(lobby::create_huawei_swapchains(
+                        &xr_session,
+                        default_view_resolution,
+                    ))
+                } else {
+                    Some(lobby::create_swapchains(
+                        &xr_session,
+                        graphics_context_slot.as_ref().unwrap(),
+                        default_view_resolution,
+                        true,
+                    ))
+                }
+            }
+
+            #[cfg(not(target_os = "android"))]
+            unreachable!("Huawei VR Glass is only supported on Android")
+        } else {
+            None
+        };
+
+        #[cfg(target_os = "android")]
+        if huawei_official_first {
+            info!(
+                "[HVR-DIAG] OpenXR swapchains enumerated; adopting the proven Huawei EGL context in wgpu"
+            );
+            graphics_context_slot = Some(Rc::new(GraphicsContext::from_huawei_egl(
+                huawei_egl.take().unwrap(),
+            )));
+        }
+
+        let graphics_context = Rc::clone(graphics_context_slot.as_ref().unwrap());
+        graphics_context.make_current();
+
+        let refresh_rates = if platform.is_huawei() {
+            // HVRSDK 3.5 does not expose XR_FB_display_refresh_rate, but the physical Huawei VR
+            // display and Runtime compositor both run at 70 Hz. Advertising the generic 90 Hz
+            // fallback overloads the Android 10 software decoder and mismatches frame pacing.
+            vec![70.0]
+        } else if exts.fb_display_refresh_rate {
             xr_session.enumerate_display_refresh_rates().unwrap()
         } else {
             vec![90.0]
@@ -264,7 +512,9 @@ pub fn entry_point() {
         let capabilities = ClientCapabilities {
             default_view_resolution,
             refresh_rates,
-            foveated_encoding: platform != Platform::Unknown,
+            // The Huawei direct framebuffer renderer does not yet implement ALVR's fixed
+            // foveated encoding inverse mapping. Keep the server on a linear stereo stream.
+            foveated_encoding: platform != Platform::Unknown && !platform.is_huawei(),
             encoder_high_profile: platform != Platform::Unknown,
             encoder_10_bits: platform != Platform::Unknown,
             encoder_av1: matches!(
@@ -292,6 +542,7 @@ pub fn entry_point() {
             platform,
             default_view_resolution,
             &last_lobby_message,
+            huawei_lobby_swapchains,
         );
         let lobby_body_tracking_config = BodyTrackingSourcesConfig {
             body_tracking_fb: Switch::Disabled,
@@ -315,6 +566,12 @@ pub fn entry_point() {
 
         let mut event_storage = xr::EventDataBuffer::new();
         'render_loop: loop {
+            #[cfg(target_os = "android")]
+            if platform.is_huawei() && HUAWEI_EXIT_REQUESTED.load(Ordering::Acquire) {
+                info!("[HVR-DIAG] Huawei Activity requested OpenXR shutdown");
+                break 'session_loop;
+            }
+
             while let Some(event) = xr_instance.poll_event(&mut event_storage).unwrap() {
                 match event {
                     xr::Event::EventsLost(event) => {
@@ -423,13 +680,14 @@ pub fn entry_point() {
                         amplitude,
                     } => {
                         let idx = if device_id == *HAND_LEFT_ID { 0 } else { 1 };
-                        let action =
-                            &interaction_context.read().hands_interaction[idx].vibration_action;
+                        let interaction_context_lock = interaction_context.read();
+                        let hand_interaction = &interaction_context_lock.hands_interaction[idx];
 
-                        action
+                        hand_interaction
+                            .vibration_action
                             .apply_feedback(
                                 &xr_session,
-                                xr::Path::NULL,
+                                hand_interaction.subaction_path,
                                 &xr::HapticVibration::new()
                                     .amplitude(amplitude.clamp(0.0, 1.0))
                                     .frequency(frequency.max(0.0))
@@ -496,7 +754,12 @@ pub fn entry_point() {
                     &[&layer.build()]
                 };
 
-            graphics_context.make_current();
+            // Huawei's legacy runtime moves the application EGL context to its compositor after
+            // releasing the acquired images. The official sample calls xrEndFrame directly;
+            // trying to reclaim the context here fails with EGL_BAD_ACCESS.
+            if !platform.is_huawei() {
+                graphics_context.make_current();
+            }
             let res = xr_frame_stream.end(
                 to_xr_time(display_time),
                 xr::EnvironmentBlendMode::OPAQUE,
@@ -525,6 +788,10 @@ pub fn entry_point() {
 
 #[allow(unused)]
 fn xr_runtime_now(xr_instance: &xr::Instance) -> Option<xr::Time> {
+    if xr_instance.exts().khr_convert_timespec_time.is_none() {
+        return None;
+    }
+
     xr_instance
         .now()
         .ok()
@@ -532,22 +799,77 @@ fn xr_runtime_now(xr_instance: &xr::Instance) -> Option<xr::Time> {
 }
 
 #[cfg(target_os = "android")]
+fn spawn_rendering_thread(
+    huawei_window: Option<ndk::native_window::NativeWindow>,
+) -> thread::JoinHandle<()> {
+    if huawei_window.is_some() {
+        HUAWEI_EXIT_REQUESTED.store(false, Ordering::Release);
+    }
+
+    thread::Builder::new()
+        .name("alvr-render".into())
+        .spawn(move || {
+            info!("[HVR-DIAG] render thread started");
+
+            // workaround for the Pico runtime
+            let context = ndk_context::android_context();
+            info!("[HVR-DIAG] Android NDK context acquired");
+            let vm = unsafe { jni::JavaVM::from_raw(context.vm().cast()) }.unwrap();
+            info!("[HVR-DIAG] Java VM acquired");
+            let _env = vm.attach_current_thread().unwrap();
+            info!("[HVR-DIAG] render thread attached to Java VM");
+
+            if let Some(native_window) = huawei_window {
+                let native_window_ptr = native_window.ptr().as_ptr().cast();
+                info!(
+                    "[HVR-DIAG] using Huawei Android native window: {}x{}",
+                    native_window.width(),
+                    native_window.height()
+                );
+                entry_point_with_window(Some(native_window_ptr));
+                drop(native_window);
+            } else {
+                entry_point();
+            }
+            info!("[HVR-DIAG] OpenXR entry point returned");
+        })
+        .unwrap()
+}
+
+#[cfg(target_os = "android")]
 #[no_mangle]
 fn android_main(app: android_activity::AndroidApp) {
     use android_activity::{InputStatus, MainEvent, PollEvent};
 
-    let rendering_thread = thread::spawn(|| {
-        // workaround for the Pico runtime
-        let context = ndk_context::android_context();
-        let vm = unsafe { jni::JavaVM::from_raw(context.vm().cast()) }.unwrap();
-        let _env = vm.attach_current_thread().unwrap();
+    alvr_client_core::init_logging();
+    info!("[HVR-DIAG] android_main entered");
 
-        entry_point();
-    });
+    let is_huawei = alvr_system_info::platform().is_huawei();
+
+    if is_huawei {
+        info!("[HVR-DIAG] initializing Huawei VR SDK Service bridge");
+        if let Err(error) = huawei_runtime::initialize() {
+            error!("[HVR-DIAG] Huawei VR SDK Service bridge initialization failed: {error}");
+            return;
+        }
+        info!("[HVR-DIAG] Huawei VR SDK Service bridge initialized");
+    }
+
+    let mut rendering_thread = (!is_huawei).then(|| spawn_rendering_thread(None));
 
     let mut should_quit = false;
     while !should_quit {
         app.poll_events(Some(Duration::from_millis(100)), |event| match event {
+            PollEvent::Main(MainEvent::InitWindow { .. }) if is_huawei => {
+                if rendering_thread.is_none() {
+                    if let Some(native_window) = app.native_window() {
+                        info!("[HVR-DIAG] Huawei InitWindow received");
+                        rendering_thread = Some(spawn_rendering_thread(Some(native_window)));
+                    } else {
+                        error!("[HVR-DIAG] Huawei InitWindow has no native window");
+                    }
+                }
+            }
             PollEvent::Main(MainEvent::Destroy) => {
                 should_quit = true;
             }
@@ -561,5 +883,7 @@ fn android_main(app: android_activity::AndroidApp) {
     }
 
     // Note: the quit event is sent from OpenXR too, this will return rather quicly.
-    rendering_thread.join().unwrap();
+    if let Some(rendering_thread) = rendering_thread {
+        rendering_thread.join().unwrap();
+    }
 }

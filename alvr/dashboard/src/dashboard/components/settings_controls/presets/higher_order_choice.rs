@@ -25,8 +25,14 @@ pub struct Control {
 impl Control {
     pub fn new(schema: HigherOrderChoiceSchema) -> Self {
         let name = components::get_display_name(&schema.name, &schema.strings);
-        let help = schema.strings.get("help").cloned();
-        let notice = schema.strings.get("notice").cloned();
+        let help = schema
+            .strings
+            .get("help")
+            .map(|text| crate::localization::schema_help(text));
+        let notice = schema
+            .strings
+            .get("notice")
+            .map(|text| crate::localization::ui_text(text));
         let steamvr_restart_flag = schema.flags.contains("steamvr-restart");
         let real_time_flag = schema.flags.contains("real-time");
 
@@ -154,20 +160,13 @@ impl Control {
                 alvr_gui_common::tooltip(
                     ui,
                     "steamvr_restart_tooltip",
-                    &format!(
-                        "Changing this setting will make SteamVR restart!\n{}",
-                        "Please save your in-game progress first"
-                    ),
+                    &format!("更改此设置将使 SteamVR 重启！\n{}", "请先保存游戏进度"),
                 );
             }
 
             // The emoji is blue but it will be green in the UI
             if self.real_time_flag && ui.colored_label(OK_GREEN, "🔵").hovered() {
-                alvr_gui_common::tooltip(
-                    ui,
-                    "real_time_tooltip",
-                    "This setting can be changed in real-time during streaming!",
-                );
+                alvr_gui_common::tooltip(ui, "real_time_tooltip", "此设置可在串流期间实时更改！");
             }
         });
 

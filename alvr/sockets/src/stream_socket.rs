@@ -18,7 +18,7 @@
 
 use crate::backend::{tcp, udp, SocketReader, SocketWriter};
 use alvr_common::{
-    anyhow::Result, debug, parking_lot::Mutex, AnyhowToCon, ConResult, HandleTryAgain, ToCon,
+    anyhow::Result, debug, parking_lot::Mutex, warn, AnyhowToCon, ConResult, HandleTryAgain, ToCon,
 };
 use alvr_session::{DscpTos, SocketBufferSize, SocketProtocol};
 use serde::{de::DeserializeOwned, Serialize};
@@ -323,6 +323,8 @@ impl StreamSocketBuilder {
             receive_socket,
             shard_recv_state: None,
             stream_recv_components: HashMap::new(),
+            logged_received_shards: 0,
+            logged_reconstructed_packets: 0,
         })
     }
 
@@ -368,6 +370,8 @@ impl StreamSocketBuilder {
             receive_socket,
             shard_recv_state: None,
             stream_recv_components: HashMap::new(),
+            logged_received_shards: 0,
+            logged_reconstructed_packets: 0,
         })
     }
 }
@@ -405,6 +409,8 @@ pub struct StreamSocket {
     receive_socket: Box<dyn SocketReader>,
     shard_recv_state: Option<RecvState>,
     stream_recv_components: HashMap<u16, StreamRecvComponents>,
+    logged_received_shards: u8,
+    logged_reconstructed_packets: u8,
 }
 
 impl StreamSocket {
@@ -475,6 +481,19 @@ impl StreamSocket {
             let packet_index = u32::from_be_bytes(bytes[6..10].try_into().unwrap());
             let shards_count = u32::from_be_bytes(bytes[10..14].try_into().unwrap()) as usize;
             let shard_index = u32::from_be_bytes(bytes[14..18].try_into().unwrap()) as usize;
+
+            if self.logged_received_shards < 12 {
+                warn!(
+                    "[HVR-DIAG] Stream shard #{}: stream={}, packet={}, shard={}/{}, bytes={}",
+                    self.logged_received_shards + 1,
+                    stream_id,
+                    packet_index,
+                    shard_index + 1,
+                    shards_count,
+                    shard_length
+                );
+                self.logged_received_shards += 1;
+            }
 
             self.shard_recv_state.insert(RecvState {
                 shard_length,
@@ -593,6 +612,17 @@ impl StreamSocket {
         // Check if packet is complete and send
         if in_progress_packet.received_shard_indices.len() == shard_recv_state_mut.shards_count {
             let size = in_progress_packet.buffer_length;
+            if self.logged_reconstructed_packets < 12 {
+                warn!(
+                    "[HVR-DIAG] Reconstructed stream packet #{}: stream={}, packet={}, shards={}, bytes={}",
+                    self.logged_reconstructed_packets + 1,
+                    shard_recv_state_mut.stream_id,
+                    shard_recv_state_mut.packet_index,
+                    shard_recv_state_mut.shards_count,
+                    size
+                );
+                self.logged_reconstructed_packets += 1;
+            }
             components
                 .packet_queue
                 .send(ReconstructedPacket {

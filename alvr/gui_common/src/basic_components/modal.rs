@@ -13,8 +13,8 @@ impl Display for ModalButton {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             ModalButton::Ok => write!(f, "OK"),
-            ModalButton::Cancel => write!(f, "Cancel"),
-            ModalButton::Close => write!(f, "Close"),
+            ModalButton::Cancel => write!(f, "取消"),
+            ModalButton::Close => write!(f, "关闭"),
             ModalButton::Custom(text) => write!(f, "{text}"),
         }
     }

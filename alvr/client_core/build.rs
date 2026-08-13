@@ -4,7 +4,11 @@ fn main() {
     if platform_name == "android" {
         println!("cargo:rustc-link-lib=log");
         println!("cargo:rustc-link-lib=EGL");
-        println!("cargo:rustc-link-lib=GLESv3");
+        if cfg!(feature = "huawei-vr-gles") {
+            println!("cargo:rustc-link-lib=GLESv2");
+        } else {
+            println!("cargo:rustc-link-lib=GLESv3");
+        }
         println!("cargo:rustc-link-lib=android");
 
         #[cfg(feature = "link-stdcpp-shared")]

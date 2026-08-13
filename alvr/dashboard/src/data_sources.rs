@@ -1,8 +1,5 @@
 use alvr_common::{
-    debug, error, info,
-    parking_lot::Mutex,
-    semver::{Version, VersionReq},
-    warn, RelaxedAtomic, ALVR_VERSION,
+    debug, error, info, parking_lot::Mutex, semver::Version, warn, RelaxedAtomic, ALVR_VERSION,
 };
 use alvr_events::{Event, EventType};
 use alvr_packets::ServerRequest;
@@ -22,7 +19,6 @@ use tungstenite::{
 };
 
 const LOCAL_REQUEST_TIMEOUT: Duration = Duration::from_millis(200);
-const REMOTE_REQUEST_TIMEOUT: Duration = Duration::from_secs(2);
 
 enum SessionSource {
     Local(Box<ServerSessionManager>),
@@ -62,8 +58,6 @@ pub fn clean_session() {
     if session_manager.session().server_version != *ALVR_VERSION {
         let mut session_ref = session_manager.session_mut();
         session_ref.server_version = ALVR_VERSION.clone();
-        session_ref.client_connections.clear();
-        session_ref.session_settings.extra.open_setup_wizard = true;
     }
 }
 
@@ -133,69 +127,9 @@ impl DataSources {
         let port = session_manager.settings().connection.web_server_port;
         let session_source = Arc::new(Mutex::new(SessionSource::Local(Box::new(session_manager))));
 
-        let version_check_thread = thread::spawn({
-            let context = context.clone();
-            let session_source = Arc::clone(&session_source);
-            let events_sender = events_sender.clone();
-            move || {
-                let version_requirement = {
-                    // Best-effort: the check will succeed only when the server is not already running,
-                    // no retries
-                    let SessionSource::Local(session_manager_lock) = &mut *session_source.lock()
-                    else {
-                        return None;
-                    };
-
-                    let version = &session_manager_lock
-                        .settings()
-                        .extra
-                        .new_version_popup
-                        .as_option()?
-                        .hide_while_version;
-
-                    VersionReq::parse(&format!(">{version}")).unwrap()
-                };
-
-                let request_agent: ureq::Agent = ureq::Agent::config_builder()
-                    .timeout_global(Some(REMOTE_REQUEST_TIMEOUT))
-                    .build()
-                    .into();
-                if let Ok(response) = request_agent
-                    .get("https://api.github.com/repos/alvr-org/ALVR/releases/latest")
-                    .call()
-                {
-                    let version_data =
-                        response.into_body().read_json::<serde_json::Value>().ok()?;
-
-                    let version_str = version_data
-                        .get("tag_name")
-                        .and_then(|v| Some(v.as_str()?.trim_start_matches("v")))?;
-
-                    let version = version_str.parse::<Version>().ok();
-
-                    if version
-                        .map(|v| version_requirement.matches(&v))
-                        .unwrap_or(false)
-                    {
-                        let message = version_data
-                            .get("body")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("Error parsing release body");
-
-                        report_event_local(
-                            &context,
-                            &events_sender,
-                            EventType::NewVersionFound {
-                                version: version_str.to_string(),
-                                message: message.to_string(),
-                            },
-                        );
-                    }
-                }
-
-                None
-            }
-        });
+        // This edition has device-specific patches. Do not offer an upstream package that would
+        // silently replace the HUAWEI/OpenXR and Chinese-localization changes.
+        let version_check_thread = thread::spawn(|| None);
 
         let requests_thread = thread::spawn({
             let running = Arc::clone(&running);
@@ -400,16 +334,13 @@ impl DataSources {
                         });
 
                     let connected = if let Some(version) = maybe_server_version {
-                        // We need exact match because we don't do session extrapolation at the
-                        // dashboard level. In the future we may relax the contraint and consider
-                        // protocol compatibility check for dashboard.
-                        let matches = version == *alvr_common::ALVR_VERSION;
-
-                        if !matches {
-                            error!("Server version mismatch: found {version}. Please remove all previous ALVR installations");
+                        if version != *alvr_common::ALVR_VERSION {
+                            warn!(
+                                "SteamVR service version differs ({version}); HUAWEI edition accepts it"
+                            );
                         }
 
-                        matches
+                        true
                     } else {
                         false
                     };

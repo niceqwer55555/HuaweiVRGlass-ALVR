@@ -16,3 +16,4 @@ khronos-egl = { version = "6", features = ["dynamic"] }
 pollster = "0.4"
 wgpu = "24"
 wgpu-core = { version = "24", features = ["gles"] }
+wgpu-hal = { version = "24", features = ["huawei-vr-egl"] }

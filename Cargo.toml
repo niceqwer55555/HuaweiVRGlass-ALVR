@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = ["alvr/*"]
+exclude = ["deps/openxrs-huawei/openxr", "deps/openxrs-huawei/sys"]
 
 [workspace.package]
 version = "20.14.1"
@@ -32,3 +33,6 @@ strip = false
 [profile.distribution]
 inherits = "release"
 lto = true
+
+[patch.crates-io]
+wgpu-hal = { path = "deps/wgpu-hal-huawei" }

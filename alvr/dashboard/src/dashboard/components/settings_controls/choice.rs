@@ -10,7 +10,7 @@ use serde_json as json;
 use std::collections::HashMap;
 
 fn get_display_name(id: &str, strings: &HashMap<String, String>) -> String {
-    strings.get("display_name").cloned().unwrap_or_else(|| {
+    crate::localization::setting_name(id, strings, || {
         let mut chars = id.chars();
 
         let mut new_chars = vec![chars.next().unwrap()];
@@ -148,7 +148,7 @@ impl Control {
                     self.variant_labels.len() + 1,
                     |idx| {
                         if idx == 0 {
-                            "Preset not applied".into()
+                            crate::localization::ui_text("Preset not applied")
                         } else {
                             self.variant_labels[idx - 1].display.clone()
                         }

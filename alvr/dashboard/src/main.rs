@@ -7,6 +7,7 @@ mod dashboard;
 mod data_sources;
 #[cfg(target_arch = "wasm32")]
 mod data_sources_wasm;
+mod localization;
 #[cfg(not(target_arch = "wasm32"))]
 mod logging_backend;
 #[cfg(not(target_arch = "wasm32"))]
@@ -72,7 +73,7 @@ fn main() {
     }
 
     eframe::run_native(
-        &format!("ALVR Dashboard (streamer v{})", *ALVR_VERSION),
+        &format!("ALVR 华为 VR Glass 串流控制台（v{}）", *ALVR_VERSION),
         NativeOptions {
             viewport: ViewportBuilder::default()
                 .with_app_id("alvr.dashboard")

@@ -37,23 +37,23 @@ use crate::audio;
 use alvr_audio as audio;
 
 const INITIAL_MESSAGE: &str = concat!(
-    "Searching for streamer...\n",
-    "Open ALVR on your PC then click \"Trust\"\n",
-    "next to the device entry",
+    "正在搜索电脑串流端…\n",
+    "请在电脑上打开 ALVR，然后在设备列表中\n",
+    "点击“信任”",
 );
-const NETWORK_UNREACHABLE_MESSAGE: &str = "Cannot connect to the streamer.\nNetwork error.";
-const SUCCESS_CONNECT_MESSAGE: &str = "Successful connection!\nPlease wait...";
-const LOCAL_TRY_MESSAGE: &str = "Trying to connect to localhost...";
+const NETWORK_UNREACHABLE_MESSAGE: &str = "无法连接到电脑串流端。\n网络错误。";
+const SUCCESS_CONNECT_MESSAGE: &str = "连接成功！\n请稍候…";
+const LOCAL_TRY_MESSAGE: &str = "正在尝试本机/USB 连接…";
 // const INCOMPATIBLE_VERSIONS_MESSAGE: &str = concat!(
 //     "Streamer and client have\n",
 //     "incompatible types.\n",
 //     "Please update either the app\n",
 //     "on the PC or on the headset",
 // );
-const STREAM_STARTING_MESSAGE: &str = "The stream will begin soon\nPlease wait...";
-const SERVER_RESTART_MESSAGE: &str = "The streamer is restarting\nPlease wait...";
-const SERVER_DISCONNECTED_MESSAGE: &str = "The streamer has disconnected.";
-const CONNECTION_TIMEOUT_MESSAGE: &str = "Connection timeout.";
+const STREAM_STARTING_MESSAGE: &str = "串流即将开始\n请稍候…";
+const SERVER_RESTART_MESSAGE: &str = "电脑串流端正在重启\n请稍候…";
+const SERVER_DISCONNECTED_MESSAGE: &str = "电脑串流端已断开连接。";
+const CONNECTION_TIMEOUT_MESSAGE: &str = "连接超时。";
 
 const DISCOVERY_RETRY_PAUSE: Duration = Duration::from_millis(500);
 const RETRY_CONNECT_MIN_INTERVAL: Duration = Duration::from_secs(1);
@@ -84,7 +84,7 @@ pub struct ConnectionContext {
 
 fn set_hud_message(event_queue: &Mutex<VecDeque<ClientCoreEvent>>, message: &str) {
     let message = format!(
-        "ALVR v{}\nhostname: {}\nIP: {}\n\n{message}",
+        "ALVR 华为专版 v{}\n主机名：{}\nIP 地址：{}\n\n{message}",
         *ALVR_VERSION,
         Config::load().hostname,
         alvr_system_info::local_ip(),
@@ -117,7 +117,7 @@ pub fn connection_lifecycle_loop(
                 Arc::clone(&lifecycle_state),
                 Arc::clone(&event_queue),
             ) {
-                let message = format!("Connection error:\n{e}\nCheck the PC for more details");
+                let message = format!("连接错误：\n{e}\n请在电脑端查看详细日志");
                 set_hud_message(&event_queue, &message);
                 error!("Connection error: {e}");
             }
@@ -265,7 +265,7 @@ fn connection_pipeline(
         }
         _ => {
             info!("Unexpected packet");
-            set_hud_message(&event_queue, "Unexpected packet");
+            set_hud_message(&event_queue, "收到无法识别的数据包。");
             return Ok(());
         }
     }
@@ -316,15 +316,38 @@ fn connection_pipeline(
         let ctx = Arc::clone(&ctx);
         move || {
             let mut stream_corrupted = true;
+            let mut logged_video_packet_count = 0_u8;
+            let mut logged_video_parse_error = false;
             while is_streaming(&ctx) {
                 let data = match video_receiver.recv(STREAMING_RECV_TIMEOUT) {
                     Ok(data) => data,
                     Err(ConnectionError::TryAgain(_)) => continue,
-                    Err(ConnectionError::Other(_)) => return,
+                    Err(ConnectionError::Other(e)) => {
+                        error!("Video receiver stopped: {e}");
+                        return;
+                    }
                 };
-                let Ok((header, nal)) = data.get() else {
-                    return;
+                let (header, nal) = match data.get() {
+                    Ok(packet) => packet,
+                    Err(e) => {
+                        if !logged_video_parse_error {
+                            error!("[HVR-DIAG] Failed to parse a reconstructed video packet: {e}");
+                            logged_video_parse_error = true;
+                        }
+                        continue;
+                    }
                 };
+
+                if logged_video_packet_count < 12 {
+                    warn!(
+                        "[HVR-DIAG] Video packet #{}: bytes={}, idr={}, packet_loss={}",
+                        logged_video_packet_count + 1,
+                        nal.len(),
+                        header.is_idr,
+                        data.had_packet_loss()
+                    );
+                    logged_video_packet_count += 1;
+                }
 
                 if let Some(stats) = &mut *ctx.statistics_manager.lock() {
                     stats.report_video_packet_received(header.timestamp);

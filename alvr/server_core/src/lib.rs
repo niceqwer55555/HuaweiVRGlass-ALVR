@@ -42,7 +42,7 @@ use std::{
     fs::File,
     io::Write,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         mpsc::{self, SyncSender, TrySendError},
         Arc, OnceLock,
     },
@@ -366,6 +366,7 @@ impl ServerCoreContext {
         // start in the corrupts state, the client didn't receive the initial IDR yet.
         static STREAM_CORRUPTED: AtomicBool = AtomicBool::new(true);
         static LAST_IDR_INSTANT: Lazy<Mutex<Instant>> = Lazy::new(|| Mutex::new(Instant::now()));
+        static LOGGED_VIDEO_ENQUEUE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
         if let Some(sender) = &*self.connection_context.video_channel_sender.lock() {
             let buffer_size = nal_buffer.len();
@@ -414,22 +415,43 @@ impl ServerCoreContext {
                     file.write_all(&nal_buffer).ok();
                 }
 
-                if matches!(
-                    sender.try_send(VideoPacket {
-                        header: VideoPacketHeader {
-                            timestamp: target_timestamp,
-                            is_idr
-                        },
-                        payload: nal_buffer,
-                    }),
-                    Err(TrySendError::Full(_))
-                ) {
-                    STREAM_CORRUPTED.store(true, Ordering::SeqCst);
-                    self.connection_context
-                        .events_sender
-                        .send(ServerCoreEvent::RequestIDR)
-                        .ok();
-                    warn!("Dropping video packet. Reason: Can't push to network");
+                let logged_index = LOGGED_VIDEO_ENQUEUE_COUNT.fetch_add(1, Ordering::Relaxed);
+                let payload_len = nal_buffer.len();
+                let enqueue_result = sender.try_send(VideoPacket {
+                    header: VideoPacketHeader {
+                        timestamp: target_timestamp,
+                        is_idr,
+                    },
+                    payload: nal_buffer,
+                });
+
+                if logged_index < 12 {
+                    warn!(
+                        "[HVR-DIAG] Server video enqueue #{}: bytes={}, idr={}, result={}",
+                        logged_index + 1,
+                        payload_len,
+                        is_idr,
+                        if enqueue_result.is_ok() {
+                            "ok"
+                        } else {
+                            "error"
+                        }
+                    );
+                }
+
+                match enqueue_result {
+                    Ok(()) => {}
+                    Err(TrySendError::Full(_)) => {
+                        STREAM_CORRUPTED.store(true, Ordering::SeqCst);
+                        self.connection_context
+                            .events_sender
+                            .send(ServerCoreEvent::RequestIDR)
+                            .ok();
+                        warn!("Dropping video packet. Reason: Can't push to network");
+                    }
+                    Err(TrySendError::Disconnected(_)) => {
+                        error!("Dropping video packet. Reason: Video send thread disconnected");
+                    }
                 }
             } else {
                 warn!("Dropping video packet. Reason: Waiting for IDR frame");

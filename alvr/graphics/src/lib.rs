@@ -1,7 +1,11 @@
+#[cfg(target_os = "android")]
+mod huawei;
 mod lobby;
 mod staging;
 mod stream;
 
+#[cfg(target_os = "android")]
+pub use huawei::*;
 pub use lobby::*;
 pub use stream::*;
 
@@ -18,10 +22,143 @@ use wgpu::{
     TextureFormat, TextureUsages, TextureView,
 };
 
+#[cfg(target_os = "android")]
+#[link(name = "EGL")]
+unsafe extern "C" {
+    fn eglGetCurrentDisplay() -> *mut c_void;
+    fn eglGetCurrentContext() -> *mut c_void;
+    fn eglGetCurrentSurface(readdraw: i32) -> *mut c_void;
+}
+
+#[cfg(target_os = "android")]
+#[link(name = "GLESv2")]
+unsafe extern "C" {
+    fn glBindTexture(target: u32, texture: u32);
+    fn glGenTextures(count: i32, textures: *mut u32);
+    fn glGetError() -> u32;
+    fn glTexImage2D(
+        target: u32,
+        level: i32,
+        internal_format: i32,
+        width: i32,
+        height: i32,
+        border: i32,
+        format: u32,
+        pixel_type: u32,
+        pixels: *const c_void,
+    );
+    fn glTexParameteri(target: u32, parameter: u32, value: i32);
+}
+
 pub const SDR_FORMAT: TextureFormat = TextureFormat::Rgba8Unorm;
 pub const SDR_FORMAT_GL: u32 = gl::RGBA8;
 pub const GL_TEXTURE_EXTERNAL_OES: u32 = 0x8D65;
 pub const MAX_PUSH_CONSTANTS_SIZE: u32 = 128;
+
+#[cfg(target_os = "android")]
+pub struct HuaweiEglContext {
+    egl: egl::DynamicInstance<egl::EGL1_4>,
+    pub display: egl::Display,
+    pub config: egl::Config,
+    pub context: egl::Context,
+    pub surface: egl::Surface,
+}
+
+#[cfg(target_os = "android")]
+impl HuaweiEglContext {
+    pub fn new(native_window: *mut c_void) -> Self {
+        let egl = unsafe {
+            egl::DynamicInstance::<egl::EGL1_4>::load_required()
+                .expect("failed to load the Android EGL 1.4 API")
+        };
+        let display = unsafe { egl.get_display(egl::DEFAULT_DISPLAY) }
+            .expect("failed to acquire the default EGL display");
+        let version = egl
+            .initialize(display)
+            .expect("failed to initialize the default EGL display");
+
+        let mut configs = Vec::with_capacity(
+            egl.get_config_count(display)
+                .expect("failed to query EGL config count"),
+        );
+        egl.get_configs(display, &mut configs)
+            .expect("failed to enumerate EGL configs");
+
+        // Match Huawei's egl_environment.cpp exactly: first GLES 3 config that supports both
+        // window and pbuffer surfaces, with RGB8, depth24 and no multisampling.
+        let config = configs
+            .into_iter()
+            .find(|&config| {
+                let attr = |name| egl.get_config_attrib(display, config, name).unwrap_or(-1);
+                attr(egl::RENDERABLE_TYPE) & egl::OPENGL_ES3_BIT == egl::OPENGL_ES3_BIT
+                    && attr(egl::SURFACE_TYPE) & (egl::WINDOW_BIT | egl::PBUFFER_BIT)
+                        == egl::WINDOW_BIT | egl::PBUFFER_BIT
+                    && attr(egl::RED_SIZE) == 8
+                    && attr(egl::GREEN_SIZE) == 8
+                    && attr(egl::BLUE_SIZE) == 8
+                    && attr(egl::DEPTH_SIZE) == 24
+                    && attr(egl::SAMPLES) == 0
+            })
+            .expect("Huawei-compatible EGL config not found");
+
+        let context_attributes = [egl::CONTEXT_CLIENT_VERSION, 3, egl::NONE];
+        let context = egl
+            .create_context(display, config, None, &context_attributes)
+            .expect("failed to create the official-style Huawei GLES 3 context");
+        let surface = unsafe {
+            egl.create_window_surface(display, config, native_window.cast(), None)
+                .expect("failed to create the Huawei EGL window surface")
+        };
+        egl.make_current(display, Some(surface), Some(surface), Some(context))
+            .expect("failed to make the Huawei EGL context current");
+
+        let attr = |name| egl.get_config_attrib(display, config, name).unwrap_or(-1);
+        alvr_common::info!(
+            "[HVR-DIAG] official-first EGL ready: version={}.{}, id={}, rgba={}/{}/{}/{}, depth={}, samples={}, surface=0x{:X}, renderable=0x{:X}, conformant=0x{:X}, display={:p}, config={:p}, context={:p}, window={:p}",
+            version.0,
+            version.1,
+            attr(egl::CONFIG_ID),
+            attr(egl::RED_SIZE),
+            attr(egl::GREEN_SIZE),
+            attr(egl::BLUE_SIZE),
+            attr(egl::ALPHA_SIZE),
+            attr(egl::DEPTH_SIZE),
+            attr(egl::SAMPLES),
+            attr(egl::SURFACE_TYPE),
+            attr(egl::RENDERABLE_TYPE),
+            attr(egl::CONFORMANT),
+            display.as_ptr(),
+            config.as_ptr(),
+            context.as_ptr(),
+            native_window,
+        );
+
+        Self {
+            egl,
+            display,
+            config,
+            context,
+            surface,
+        }
+    }
+
+    pub fn make_current(&self) {
+        self.egl
+            .make_current(
+                self.display,
+                Some(self.surface),
+                Some(self.surface),
+                Some(self.context),
+            )
+            .expect("failed to restore the Huawei EGL context");
+    }
+
+    pub fn get_proc_address(&self, name: &str) -> *const c_void {
+        self.egl
+            .get_proc_address(name)
+            .map_or(ptr::null(), |function| function as *const c_void)
+    }
+}
 
 type CreateImageFn = unsafe extern "C" fn(
     egl::EGLDisplay,
@@ -199,8 +336,11 @@ pub struct GraphicsContext {
     pub egl_context: egl::Context,
     pub gl_context: gl::Context,
 
+    #[cfg(target_os = "android")]
+    huawei_egl: Option<HuaweiEglContext>,
+
     #[cfg_attr(windows, expect(dead_code))]
-    dummy_surface: egl::Surface,
+    render_surface: egl::Surface,
 
     create_image: CreateImageFn,
     destroy_image: DestroyImageFn,
@@ -211,6 +351,104 @@ pub struct GraphicsContext {
 impl GraphicsContext {
     #[cfg(not(windows))]
     pub fn new_gl() -> Self {
+        Self::new_gl_internal(None)
+    }
+
+    #[cfg(target_os = "android")]
+    pub fn new_gl_with_window(native_window: *mut c_void) -> Self {
+        Self::new_gl_internal(Some(native_window))
+    }
+
+    #[cfg(target_os = "android")]
+    pub fn from_huawei_egl(huawei_egl: HuaweiEglContext) -> Self {
+        use std::mem;
+        use wgpu::{
+            Backends, DeviceDescriptor, Features, InstanceDescriptor, InstanceFlags, Limits,
+            MemoryHints,
+        };
+
+        const CREATE_IMAGE_FN_STR: &str = "eglCreateImageKHR";
+        const DESTROY_IMAGE_FN_STR: &str = "eglDestroyImageKHR";
+        const GET_NATIVE_CLIENT_BUFFER_FN_STR: &str = "eglGetNativeClientBufferANDROID";
+        const IMAGE_TARGET_TEXTURE_2D_FN_STR: &str = "glEGLImageTargetTexture2DOES";
+
+        // OpenXR has already created and enumerated its images on this context. Only now create
+        // wgpu's bookkeeping instance, then restore and adopt the original context as an external
+        // GLES adapter. This prevents wgpu from initializing the context seen by Huawei Runtime.
+        let flags = if cfg!(debug_assertions) {
+            InstanceFlags::DEBUG | InstanceFlags::VALIDATION
+        } else {
+            InstanceFlags::empty()
+        };
+        let instance = Instance::new(&InstanceDescriptor {
+            backends: Backends::GL,
+            flags,
+            backend_options: Default::default(),
+        });
+        huawei_egl.make_current();
+
+        let exposed_adapter = unsafe {
+            <api::Gles as hal::Api>::Adapter::new_external(|name| huawei_egl.get_proc_address(name))
+        }
+        .expect("failed to adopt the Huawei GLES context in wgpu-hal");
+        let adapter = unsafe { instance.create_adapter_from_hal(exposed_adapter) };
+        let (device, queue) = pollster::block_on(adapter.request_device(
+            &DeviceDescriptor {
+                label: Some("Huawei VR external GLES device"),
+                required_features: Features::PUSH_CONSTANTS,
+                required_limits: Limits {
+                    max_push_constant_size: MAX_PUSH_CONSTANTS_SIZE,
+                    ..adapter.limits()
+                },
+                memory_hints: MemoryHints::Performance,
+            },
+            None,
+        ))
+        .expect("failed to create a wgpu device from the Huawei GLES context");
+        huawei_egl.make_current();
+
+        let gl_context =
+            unsafe { gl::Context::from_loader_function(|name| huawei_egl.get_proc_address(name)) };
+        unsafe {
+            alvr_common::info!(
+                "[HVR-DIAG] wgpu adopted official-first GLES context: adapter={:?}, version={}, vendor={}, renderer={}",
+                adapter.get_info(),
+                gl_context.get_parameter_string(gl::VERSION),
+                gl_context.get_parameter_string(gl::VENDOR),
+                gl_context.get_parameter_string(gl::RENDERER),
+            );
+        }
+
+        let get_fn_ptr = |name| huawei_egl.get_proc_address(name);
+        let create_image: CreateImageFn =
+            unsafe { mem::transmute(get_fn_ptr(CREATE_IMAGE_FN_STR)) };
+        let destroy_image: DestroyImageFn =
+            unsafe { mem::transmute(get_fn_ptr(DESTROY_IMAGE_FN_STR)) };
+        let get_native_client_buffer: GetNativeClientBufferFn =
+            unsafe { mem::transmute(get_fn_ptr(GET_NATIVE_CLIENT_BUFFER_FN_STR)) };
+        let image_target_texture_2d: ImageTargetTexture2DFn =
+            unsafe { mem::transmute(get_fn_ptr(IMAGE_TARGET_TEXTURE_2D_FN_STR)) };
+
+        Self {
+            _instance: instance,
+            adapter,
+            device,
+            queue,
+            egl_display: huawei_egl.display,
+            egl_config: huawei_egl.config,
+            egl_context: huawei_egl.context,
+            gl_context,
+            render_surface: huawei_egl.surface,
+            huawei_egl: Some(huawei_egl),
+            create_image,
+            destroy_image,
+            get_native_client_buffer,
+            image_target_texture_2d,
+        }
+    }
+
+    #[cfg(not(windows))]
+    fn new_gl_internal(native_window: Option<*mut c_void>) -> Self {
         use std::mem;
         use wgpu::{
             Backends, DeviceDescriptor, Features, InstanceDescriptor, InstanceFlags, Limits,
@@ -257,7 +495,7 @@ impl GraphicsContext {
         let (
             egl_context,
             gl_context,
-            dummy_surface,
+            render_surface,
             create_image,
             destroy_image,
             get_native_client_buffer,
@@ -269,16 +507,46 @@ impl GraphicsContext {
 
                 let egl_context = egl::Context::from_ptr(adapter_context.raw_context());
 
-                const PBUFFER_ATTRIBS: [i32; 5] = [egl::WIDTH, 16, egl::HEIGHT, 16, egl::NONE];
-                let dummy_surface = egl_instance
-                    .create_pbuffer_surface(egl_display, egl_config, &PBUFFER_ATTRIBS)
-                    .unwrap();
+                if native_window.is_some() {
+                    let config_attr = |attribute| {
+                        egl_instance
+                            .get_config_attrib(egl_display, egl_config, attribute)
+                            .unwrap_or(-1)
+                    };
+                    alvr_common::info!(
+                        "[HVR-DIAG] selected EGL config: id={}, rgba={}/{}/{}/{}, depth={}, samples={}, surface=0x{:X}, renderable=0x{:X}, conformant=0x{:X}, native={}",
+                        config_attr(egl::CONFIG_ID),
+                        config_attr(egl::RED_SIZE),
+                        config_attr(egl::GREEN_SIZE),
+                        config_attr(egl::BLUE_SIZE),
+                        config_attr(egl::ALPHA_SIZE),
+                        config_attr(egl::DEPTH_SIZE),
+                        config_attr(egl::SAMPLES),
+                        config_attr(egl::SURFACE_TYPE),
+                        config_attr(egl::RENDERABLE_TYPE),
+                        config_attr(egl::CONFORMANT),
+                        config_attr(egl::NATIVE_RENDERABLE),
+                    );
+                }
+
+                let render_surface = if let Some(native_window) = native_window {
+                    // Huawei's runtime only exports valid GLES swapchain textures when the
+                    // session context is current on the Activity's real window surface.
+                    egl_instance
+                        .create_window_surface(egl_display, egl_config, native_window.cast(), None)
+                        .unwrap()
+                } else {
+                    const PBUFFER_ATTRIBS: [i32; 5] = [egl::WIDTH, 16, egl::HEIGHT, 16, egl::NONE];
+                    egl_instance
+                        .create_pbuffer_surface(egl_display, egl_config, &PBUFFER_ATTRIBS)
+                        .unwrap()
+                };
 
                 egl_instance
                     .make_current(
                         egl_display,
-                        Some(dummy_surface),
-                        Some(dummy_surface),
+                        Some(render_surface),
+                        Some(render_surface),
                         Some(egl_context),
                     )
                     .unwrap();
@@ -288,6 +556,15 @@ impl GraphicsContext {
                         .get_proc_address(fn_name)
                         .map_or(ptr::null(), |f| f as *const c_void)
                 });
+
+                if native_window.is_some() {
+                    alvr_common::info!(
+                        "[HVR-DIAG] GLES context: version={}, vendor={}, renderer={}",
+                        gl_context.get_parameter_string(gl::VERSION),
+                        gl_context.get_parameter_string(gl::VENDOR),
+                        gl_context.get_parameter_string(gl::RENDERER),
+                    );
+                }
 
                 let get_fn_ptr = |fn_name| {
                     egl_instance
@@ -306,7 +583,7 @@ impl GraphicsContext {
                 (
                     egl_context,
                     gl_context,
-                    dummy_surface,
+                    render_surface,
                     create_image,
                     destroy_image,
                     get_native_client_buffer,
@@ -324,7 +601,9 @@ impl GraphicsContext {
             egl_config,
             egl_context,
             gl_context,
-            dummy_surface,
+            #[cfg(target_os = "android")]
+            huawei_egl: None,
+            render_surface,
             create_image,
             destroy_image,
             get_native_client_buffer,
@@ -338,6 +617,12 @@ impl GraphicsContext {
     }
 
     pub fn make_current(&self) {
+        #[cfg(target_os = "android")]
+        if let Some(huawei_egl) = &self.huawei_egl {
+            huawei_egl.make_current();
+            return;
+        }
+
         #[cfg(not(windows))]
         unsafe {
             self.adapter.as_hal::<api::Gles, _, _>(|raw_adapter| {
@@ -350,13 +635,103 @@ impl GraphicsContext {
                 egl_instance
                     .make_current(
                         self.egl_display,
-                        Some(self.dummy_surface),
-                        Some(self.dummy_surface),
+                        Some(self.render_surface),
+                        Some(self.render_surface),
                         Some(self.egl_context),
                     )
                     .unwrap();
             })
         };
+    }
+
+    #[cfg(not(windows))]
+    pub fn log_current_egl(&self, stage: &str) {
+        #[cfg(target_os = "android")]
+        if self.huawei_egl.is_some() {
+            unsafe {
+                alvr_common::info!(
+                    "[HVR-DIAG] official-first EGL current at {stage}: display={:?}, context={:?}, draw={:?}, read={:?}, gl_error=0x{:X}",
+                    eglGetCurrentDisplay(),
+                    eglGetCurrentContext(),
+                    eglGetCurrentSurface(egl::DRAW),
+                    eglGetCurrentSurface(egl::READ),
+                    glGetError(),
+                );
+            }
+            return;
+        }
+
+        unsafe {
+            self.adapter.as_hal::<api::Gles, _, _>(|raw_adapter| {
+                let egl_instance = raw_adapter
+                    .unwrap()
+                    .adapter_context()
+                    .egl_instance()
+                    .unwrap();
+                let current_display = egl_instance.get_current_display().map(|value| value.as_ptr());
+                let current_context = egl_instance.get_current_context().map(|value| value.as_ptr());
+                let draw_surface = egl_instance
+                    .get_current_surface(egl::DRAW)
+                    .map(|value| value.as_ptr());
+                let read_surface = egl_instance
+                    .get_current_surface(egl::READ)
+                    .map(|value| value.as_ptr());
+
+                alvr_common::info!(
+                    "[HVR-DIAG] EGL current at {stage}: display={current_display:?}, context={current_context:?}, draw={draw_surface:?}, read={read_surface:?}, gl_error=0x{:X}",
+                    self.gl_context.get_error()
+                );
+
+                #[cfg(target_os = "android")]
+                alvr_common::info!(
+                    "[HVR-DIAG] directly linked EGL/GLES at {stage}: display={:?}, context={:?}, draw={:?}, read={:?}, gl_error=0x{:X}",
+                    eglGetCurrentDisplay(),
+                    eglGetCurrentContext(),
+                    eglGetCurrentSurface(egl::DRAW),
+                    eglGetCurrentSurface(egl::READ),
+                    glGetError(),
+                );
+            });
+        }
+    }
+
+    #[cfg(target_os = "android")]
+    pub fn warm_up_huawei_gles(&self) -> u32 {
+        const GL_LINEAR: i32 = 0x2601;
+        const GL_RGBA: u32 = 0x1908;
+        const GL_TEXTURE_2D: u32 = 0x0DE1;
+        const GL_TEXTURE_MAG_FILTER: u32 = 0x2800;
+        const GL_TEXTURE_MIN_FILTER: u32 = 0x2801;
+        const GL_UNSIGNED_BYTE: u32 = 0x1401;
+
+        unsafe {
+            while glGetError() != gl::NO_ERROR {}
+
+            let mut texture = 0;
+            glGenTextures(1, &mut texture);
+            glBindTexture(GL_TEXTURE_2D, texture);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexImage2D(
+                GL_TEXTURE_2D,
+                0,
+                gl::RGBA8 as i32,
+                1,
+                1,
+                0,
+                GL_RGBA,
+                GL_UNSIGNED_BYTE,
+                ptr::null(),
+            );
+            glBindTexture(GL_TEXTURE_2D, 0);
+
+            alvr_common::info!(
+                "[HVR-DIAG] direct GLES warm-up texture before xrCreateSession: texture={texture}, gl_error=0x{:X}",
+                glGetError()
+            );
+
+            texture
+        }
     }
 
     /// # Safety

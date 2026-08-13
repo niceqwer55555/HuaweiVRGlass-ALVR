@@ -96,13 +96,20 @@ fn create_ext_object<T>(
 }
 
 pub enum ButtonAction {
-    Binary(xr::Action<bool>),
-    Scalar(xr::Action<f32>),
+    Binary {
+        action: xr::Action<bool>,
+        subaction_path: xr::Path,
+    },
+    Scalar {
+        action: xr::Action<f32>,
+        subaction_path: xr::Path,
+    },
 }
 
 pub struct HandInteraction {
     pub controllers_profile_id: u64,
     pub pose_offset: Pose,
+    pub subaction_path: xr::Path,
 
     pub grip_action: xr::Action<xr::Posef>,
     pub grip_space: xr::Space,
@@ -192,6 +199,22 @@ impl InteractionContext {
 
         let mut bindings = vec![];
 
+        let left_hand_path = xr_instance.string_to_path(HAND_LEFT_PATH).unwrap();
+        let right_hand_path = xr_instance.string_to_path(HAND_RIGHT_PATH).unwrap();
+        let left_hand_subaction_paths = [left_hand_path];
+        let right_hand_subaction_paths = [right_hand_path];
+        let both_hand_subaction_paths = [left_hand_path, right_hand_path];
+        let left_action_subaction_paths = if platform.is_huawei() {
+            left_hand_subaction_paths.as_slice()
+        } else {
+            &[]
+        };
+        let right_action_subaction_paths = if platform.is_huawei() {
+            right_hand_subaction_paths.as_slice()
+        } else {
+            &[]
+        };
+
         fn binding<'a, T: xr::ActionTy>(action: &'a xr::Action<T>, path: &str) -> xr::Binding<'a> {
             xr::Binding::new(action, action.instance().string_to_path(path).unwrap())
         }
@@ -207,94 +230,251 @@ impl InteractionContext {
             p if p.is_pico() => PICO4S_CONTROLLER_PROFILE_PATH,
             p if p.is_vive() => FOCUS3_CONTROLLER_PROFILE_PATH,
             p if p.is_yvr() => YVR_CONTROLLER_PROFILE_PATH,
+            Platform::HuaweiVrGlass => HUAWEI_CONTROLLER_PROFILE_PATH,
             _ => QUEST_CONTROLLER_PROFILE_PATH,
         };
         let controllers_profile_id = alvr_common::hash_string(controllers_profile_path);
 
         // Create actions:
 
-        let mut button_actions = HashMap::new();
-        for button_id in &CONTROLLER_PROFILE_INFO
+        let profile_button_set = &CONTROLLER_PROFILE_INFO
             .get(&controllers_profile_id)
             .unwrap()
-            .button_set
-        {
+            .button_set;
+        let huawei_action_name = |path: &str| {
+            path[1..]
+                .replace('/', "_")
+                .replace("user_hand_left_", "user_hand_")
+                .replace("user_hand_right_", "user_hand_")
+        };
+        let mut huawei_action_counts = HashMap::new();
+        if platform.is_huawei() {
+            for button_id in profile_button_set {
+                let info = BUTTON_INFO.get(button_id).unwrap();
+                *huawei_action_counts
+                    .entry(huawei_action_name(info.path))
+                    .or_insert(0_usize) += 1;
+            }
+        }
+
+        let mut huawei_binary_actions = HashMap::<String, xr::Action<bool>>::new();
+        let mut huawei_scalar_actions = HashMap::<String, xr::Action<f32>>::new();
+        let mut button_actions = HashMap::new();
+        for button_id in profile_button_set {
             let info = BUTTON_INFO.get(button_id).unwrap();
 
-            let name = info.path[1..].replace('/', "_");
+            let name = if platform.is_huawei() {
+                huawei_action_name(info.path)
+            } else {
+                info.path[1..].replace('/', "_")
+            };
             let display_name = format!(
                 "{}{}",
                 name[0..1].to_uppercase(),
                 name[1..].replace('_', " ")
             );
 
+            let subaction_path = if platform.is_huawei() {
+                if info.device_id == *HAND_LEFT_ID {
+                    left_hand_path
+                } else {
+                    right_hand_path
+                }
+            } else {
+                xr::Path::NULL
+            };
+            let subaction_paths = if platform.is_huawei()
+                && huawei_action_counts.get(&name).copied().unwrap_or(0) > 1
+            {
+                both_hand_subaction_paths.as_slice()
+            } else if subaction_path == xr::Path::NULL {
+                &[][..]
+            } else {
+                std::slice::from_ref(&subaction_path)
+            };
+
             let action = match info.button_type {
-                ButtonType::Binary => ButtonAction::Binary(
-                    action_set.create_action(&name, &display_name, &[]).unwrap(),
-                ),
-                ButtonType::Scalar => ButtonAction::Scalar(
-                    action_set.create_action(&name, &display_name, &[]).unwrap(),
-                ),
+                ButtonType::Binary => ButtonAction::Binary {
+                    action: if platform.is_huawei() {
+                        if let Some(action) = huawei_binary_actions.get(&name) {
+                            action.clone()
+                        } else {
+                            let action = action_set
+                                .create_action(&name, &display_name, subaction_paths)
+                                .unwrap();
+                            huawei_binary_actions.insert(name.clone(), action.clone());
+                            action
+                        }
+                    } else {
+                        action_set
+                            .create_action(&name, &display_name, subaction_paths)
+                            .unwrap()
+                    },
+                    subaction_path,
+                },
+                ButtonType::Scalar => ButtonAction::Scalar {
+                    action: if platform.is_huawei() {
+                        if let Some(action) = huawei_scalar_actions.get(&name) {
+                            action.clone()
+                        } else {
+                            let action = action_set
+                                .create_action(&name, &display_name, subaction_paths)
+                                .unwrap();
+                            huawei_scalar_actions.insert(name.clone(), action.clone());
+                            action
+                        }
+                    } else {
+                        action_set
+                            .create_action(&name, &display_name, subaction_paths)
+                            .unwrap()
+                    },
+                    subaction_path,
+                },
             };
             button_actions.insert(*button_id, action);
         }
 
-        let left_grip_action = action_set
-            .create_action("left_grip_pose", "Left grip pose", &[])
-            .unwrap();
-        let right_grip_action = action_set
-            .create_action("right_grip_pose", "Right grip pose", &[])
-            .unwrap();
+        let (left_grip_action, right_grip_action, left_aim_action, right_aim_action) =
+            if platform.is_huawei() {
+                // Huawei's legacy runtime does not reliably distinguish two action spaces that
+                // originate from one pose action with left/right subactions. Keep one pose action
+                // per hand, while reusing it for that hand's grip and aim spaces, so both
+                // controllers get independent tracking without creating four runtime pose actions.
+                let left_action = action_set
+                    .create_action(
+                        "left_controller_aim_pose",
+                        "Left controller aim pose",
+                        &left_hand_subaction_paths,
+                    )
+                    .unwrap();
+                let right_action = action_set
+                    .create_action(
+                        "right_controller_aim_pose",
+                        "Right controller aim pose",
+                        &right_hand_subaction_paths,
+                    )
+                    .unwrap();
+                (
+                    left_action.clone(),
+                    right_action.clone(),
+                    left_action,
+                    right_action,
+                )
+            } else {
+                (
+                    action_set
+                        .create_action(
+                            "left_grip_pose",
+                            "Left grip pose",
+                            left_action_subaction_paths,
+                        )
+                        .unwrap(),
+                    action_set
+                        .create_action(
+                            "right_grip_pose",
+                            "Right grip pose",
+                            right_action_subaction_paths,
+                        )
+                        .unwrap(),
+                    action_set
+                        .create_action(
+                            "left_aim_pose",
+                            "Left aim pose",
+                            left_action_subaction_paths,
+                        )
+                        .unwrap(),
+                    action_set
+                        .create_action(
+                            "right_aim_pose",
+                            "Right aim pose",
+                            right_action_subaction_paths,
+                        )
+                        .unwrap(),
+                )
+            };
 
-        let left_aim_action = action_set
-            .create_action("left_aim_pose", "Left aim pose", &[])
-            .unwrap();
-        let right_aim_action = action_set
-            .create_action("right_aim_pose", "Right aim pose", &[])
-            .unwrap();
-
-        let left_vibration_action = action_set
-            .create_action("left_hand_vibration", "Left hand vibration", &[])
-            .unwrap();
-        let right_vibration_action = action_set
-            .create_action("right_hand_vibration", "Right hand vibration", &[])
-            .unwrap();
+        let (left_vibration_action, right_vibration_action) = if platform.is_huawei() {
+            let action = action_set
+                .create_action(
+                    "controller_haptic",
+                    "Controller haptic",
+                    &both_hand_subaction_paths,
+                )
+                .unwrap();
+            (action.clone(), action)
+        } else {
+            (
+                action_set
+                    .create_action(
+                        "left_hand_vibration",
+                        "Left hand vibration",
+                        left_action_subaction_paths,
+                    )
+                    .unwrap(),
+                action_set
+                    .create_action(
+                        "right_hand_vibration",
+                        "Right hand vibration",
+                        right_action_subaction_paths,
+                    )
+                    .unwrap(),
+            )
+        };
 
         // Create action bindings:
 
         for (id, action) in &button_actions {
-            let path = &BUTTON_INFO.get(id).unwrap().path;
+            let standard_path = BUTTON_INFO.get(id).unwrap().path;
+            let path = if platform.is_huawei() {
+                standard_path
+                    .replace("/input/squeeze/", "/input/grip/")
+                    .replace("/input/system/click", "/input/home/click")
+            } else {
+                standard_path.to_owned()
+            };
             match action {
-                ButtonAction::Binary(action) => {
-                    bindings.push(binding(action, path));
+                ButtonAction::Binary { action, .. } => {
+                    bindings.push(binding(action, &path));
                 }
-                ButtonAction::Scalar(action) => {
-                    bindings.push(binding(action, path));
+                ButtonAction::Scalar { action, .. } => {
+                    bindings.push(binding(action, &path));
                 }
             }
         }
 
-        bindings.push(binding(
-            &left_grip_action,
-            "/user/hand/left/input/grip/pose",
-        ));
-        bindings.push(binding(
-            &right_grip_action,
-            "/user/hand/right/input/grip/pose",
-        ));
-
-        bindings.push(binding(&left_aim_action, "/user/hand/left/input/aim/pose"));
-        bindings.push(binding(
-            &right_aim_action,
-            "/user/hand/right/input/aim/pose",
-        ));
+        let left_tracking_pose_path = if platform.is_huawei() {
+            "/user/hand/left/input/aim/pose"
+        } else {
+            "/user/hand/left/input/grip/pose"
+        };
+        let right_tracking_pose_path = if platform.is_huawei() {
+            "/user/hand/right/input/aim/pose"
+        } else {
+            "/user/hand/right/input/grip/pose"
+        };
+        if platform.is_huawei() {
+            bindings.push(binding(&left_grip_action, left_tracking_pose_path));
+            bindings.push(binding(&right_grip_action, right_tracking_pose_path));
+        } else {
+            bindings.push(binding(&left_grip_action, left_tracking_pose_path));
+            bindings.push(binding(&right_grip_action, right_tracking_pose_path));
+            bindings.push(binding(&left_aim_action, "/user/hand/left/input/aim/pose"));
+            bindings.push(binding(
+                &right_aim_action,
+                "/user/hand/right/input/aim/pose",
+            ));
+        }
 
         bindings.push(binding(
             &left_vibration_action,
             "/user/hand/left/output/haptic",
         ));
         bindings.push(binding(
-            &right_vibration_action,
+            if platform.is_huawei() {
+                &left_vibration_action
+            } else {
+                &right_vibration_action
+            },
             "/user/hand/right/output/haptic",
         ));
 
@@ -387,17 +567,49 @@ impl InteractionContext {
         xr_session.attach_action_sets(&[&action_set]).unwrap();
 
         let left_grip_space = left_grip_action
-            .create_space(xr_session.clone(), xr::Path::NULL, xr::Posef::IDENTITY)
+            .create_space(
+                xr_session.clone(),
+                if platform.is_huawei() {
+                    left_hand_path
+                } else {
+                    xr::Path::NULL
+                },
+                xr::Posef::IDENTITY,
+            )
             .unwrap();
         let right_grip_space = right_grip_action
-            .create_space(xr_session.clone(), xr::Path::NULL, xr::Posef::IDENTITY)
+            .create_space(
+                xr_session.clone(),
+                if platform.is_huawei() {
+                    right_hand_path
+                } else {
+                    xr::Path::NULL
+                },
+                xr::Posef::IDENTITY,
+            )
             .unwrap();
 
         let left_aim_space = left_aim_action
-            .create_space(xr_session.clone(), xr::Path::NULL, xr::Posef::IDENTITY)
+            .create_space(
+                xr_session.clone(),
+                if platform.is_huawei() {
+                    left_hand_path
+                } else {
+                    xr::Path::NULL
+                },
+                xr::Posef::IDENTITY,
+            )
             .unwrap();
         let right_aim_space = right_aim_action
-            .create_space(xr_session.clone(), xr::Path::NULL, xr::Posef::IDENTITY)
+            .create_space(
+                xr_session.clone(),
+                if platform.is_huawei() {
+                    right_hand_path
+                } else {
+                    xr::Path::NULL
+                },
+                xr::Posef::IDENTITY,
+            )
             .unwrap();
 
         let left_hand_tracker = create_ext_object("HandTracker (left)", Some(true), || {
@@ -435,6 +647,11 @@ impl InteractionContext {
                 HandInteraction {
                     controllers_profile_id,
                     pose_offset: get_controller_offset(platform, false),
+                    subaction_path: if platform.is_huawei() {
+                        left_hand_path
+                    } else {
+                        xr::Path::NULL
+                    },
                     grip_action: left_grip_action,
                     grip_space: left_grip_space,
                     aim_action: left_aim_action,
@@ -445,6 +662,11 @@ impl InteractionContext {
                 HandInteraction {
                     controllers_profile_id,
                     pose_offset: get_controller_offset(platform, true),
+                    subaction_path: if platform.is_huawei() {
+                        right_hand_path
+                    } else {
+                        xr::Path::NULL
+                    },
                     grip_action: right_grip_action,
                     grip_space: right_grip_space,
                     aim_action: right_aim_action,
@@ -753,10 +975,26 @@ pub fn get_hand_data(
 
     let controller_motion = if hand_source
         .grip_action
-        .is_active(xr_session, xr::Path::NULL)
+        .is_active(xr_session, hand_source.subaction_path)
         .unwrap_or(false)
     {
-        if let Ok((location, velocity)) = hand_source.grip_space.relate(reference_space, xr_time) {
+        // Huawei's legacy OpenXR runtime corrupts the optional XrSpaceVelocity payload: values can
+        // contain controller positions or enormous but finite numbers. Query only XrSpaceLocation,
+        // matching Huawei's official sample, and report zero velocity rather than letting SteamVR
+        // reject an otherwise valid controller pose.
+        let location_and_velocity = if platform.is_huawei() {
+            hand_source
+                .grip_space
+                .locate(reference_space, xr_time)
+                .map(|location| (location, None))
+        } else {
+            hand_source
+                .grip_space
+                .relate(reference_space, xr_time)
+                .map(|(location, velocity)| (location, Some(velocity)))
+        };
+
+        if let Ok((location, velocity)) = location_and_velocity {
             let orientation_valid = location
                 .location_flags
                 .contains(xr::SpaceLocationFlags::ORIENTATION_VALID);
@@ -765,17 +1003,45 @@ pub fn get_hand_data(
                 .contains(xr::SpaceLocationFlags::POSITION_VALID);
 
             if orientation_valid {
-                last_controller_pose.orientation = crate::from_xr_quat(location.pose.orientation);
+                let orientation = crate::from_xr_quat(location.pose.orientation);
+                if orientation.is_finite() {
+                    last_controller_pose.orientation = orientation;
+                }
             }
 
             if position_valid {
-                last_controller_pose.position = crate::from_xr_vec3(location.pose.position);
+                let position = crate::from_xr_vec3(location.pose.position);
+                if position.is_finite() {
+                    last_controller_pose.position = position;
+                }
             }
 
             let pose = *last_controller_pose * hand_source.pose_offset;
 
-            let mut linear_velocity = crate::from_xr_vec3(velocity.linear_velocity);
-            let mut angular_velocity = crate::from_xr_vec3(velocity.angular_velocity);
+            let mut linear_velocity = velocity
+                .as_ref()
+                .filter(|velocity| {
+                    velocity
+                        .velocity_flags
+                        .contains(xr::SpaceVelocityFlags::LINEAR_VALID)
+                })
+                .map(|velocity| crate::from_xr_vec3(velocity.linear_velocity))
+                .unwrap_or(Vec3::ZERO);
+            let mut angular_velocity = velocity
+                .as_ref()
+                .filter(|velocity| {
+                    velocity
+                        .velocity_flags
+                        .contains(xr::SpaceVelocityFlags::ANGULAR_VALID)
+                })
+                .map(|velocity| crate::from_xr_vec3(velocity.angular_velocity))
+                .unwrap_or(Vec3::ZERO);
+            if !linear_velocity.is_finite() {
+                linear_velocity = Vec3::ZERO;
+            }
+            if !angular_velocity.is_finite() {
+                angular_velocity = Vec3::ZERO;
+            }
 
             // Some headsets use wrong frame of reference for linear and angular velocities.
             if platform.is_pico() || platform.is_vive() {
@@ -865,13 +1131,17 @@ pub fn get_hand_data(
 
 pub fn update_buttons(
     xr_session: &xr::Session<xr::OpenGlEs>,
+    platform: Platform,
     button_actions: &HashMap<u64, ButtonAction>,
 ) -> Vec<ButtonEntry> {
     let mut button_entries = Vec::with_capacity(2);
     for (id, action) in button_actions {
         match action {
-            ButtonAction::Binary(action) => {
-                let Ok(state) = action.state(xr_session, xr::Path::NULL) else {
+            ButtonAction::Binary {
+                action,
+                subaction_path,
+            } => {
+                let Ok(state) = action.state(xr_session, *subaction_path) else {
                     continue;
                 };
 
@@ -882,15 +1152,25 @@ pub fn update_buttons(
                     });
                 }
             }
-            ButtonAction::Scalar(action) => {
-                let Ok(state) = action.state(xr_session, xr::Path::NULL) else {
+            ButtonAction::Scalar {
+                action,
+                subaction_path,
+            } => {
+                let Ok(state) = action.state(xr_session, *subaction_path) else {
                     continue;
                 };
 
                 if state.changed_since_last_sync {
+                    let value = if platform.is_huawei()
+                        && (*id == *LEFT_THUMBSTICK_Y_ID || *id == *RIGHT_THUMBSTICK_Y_ID)
+                    {
+                        -state.current_state
+                    } else {
+                        state.current_state
+                    };
                     button_entries.push(ButtonEntry {
                         path_id: *id,
-                        value: ButtonValue::Scalar(state.current_state),
+                        value: ButtonValue::Scalar(value),
                     });
                 }
             }
