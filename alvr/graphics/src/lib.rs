@@ -171,6 +171,10 @@ type DestroyImageFn = unsafe extern "C" fn(egl::EGLDisplay, egl::EGLImage) -> eg
 type GetNativeClientBufferFn = unsafe extern "C" fn(*const c_void) -> egl::EGLClientBuffer;
 type ImageTargetTexture2DFn = unsafe extern "C" fn(egl::Enum, egl::EGLImage);
 
+pub(crate) struct ImportedHardwareBuffer {
+    image: egl::EGLImage,
+}
+
 pub fn check_error(gl: &gl::Context, message_context: &str) {
     let err = unsafe { gl.get_error() };
     if err != glow::NO_ERROR {
@@ -737,38 +741,62 @@ impl GraphicsContext {
     /// # Safety
     /// `buffer` must be a valid AHardwareBuffer.
     /// `texture` must be a valid GL texture.
+    pub(crate) unsafe fn import_ahardwarebuffer_to_texture(
+        &self,
+        buffer: *const c_void,
+        texture: gl::Texture,
+    ) -> Option<ImportedHardwareBuffer> {
+        const EGL_NATIVE_BUFFER_ANDROID: u32 = 0x3140;
+
+        if buffer.is_null() {
+            return None;
+        }
+
+        let client_buffer = (self.get_native_client_buffer)(buffer);
+        check_error(&self.gl_context, "get_native_client_buffer");
+
+        let image = (self.create_image)(
+            self.egl_display.as_ptr(),
+            egl::NO_CONTEXT,
+            EGL_NATIVE_BUFFER_ANDROID,
+            client_buffer,
+            ptr::null(),
+        );
+        check_error(&self.gl_context, "create_image");
+
+        self.gl_context
+            .bind_texture(GL_TEXTURE_EXTERNAL_OES, Some(texture));
+        check_error(&self.gl_context, "bind texture OES");
+
+        (self.image_target_texture_2d)(GL_TEXTURE_EXTERNAL_OES, image);
+        check_error(&self.gl_context, "image_target_texture_2d");
+
+        Some(ImportedHardwareBuffer { image })
+    }
+
+    /// # Safety
+    /// `imported_buffer` must have been created by this graphics context. Rendering commands that
+    /// reference its texture must have been submitted before release.
+    pub(crate) unsafe fn release_imported_hardware_buffer(
+        &self,
+        imported_buffer: ImportedHardwareBuffer,
+    ) {
+        (self.destroy_image)(self.egl_display.as_ptr(), imported_buffer.image);
+        check_error(&self.gl_context, "destroy_image");
+    }
+
+    /// # Safety
+    /// `buffer` must be a valid AHardwareBuffer.
+    /// `texture` must be a valid GL texture.
     pub unsafe fn render_ahardwarebuffer_using_texture(
         &self,
         buffer: *const c_void,
         texture: gl::Texture,
         render_cb: impl FnOnce(),
     ) {
-        const EGL_NATIVE_BUFFER_ANDROID: u32 = 0x3140;
-
-        if !buffer.is_null() {
-            let client_buffer = (self.get_native_client_buffer)(buffer);
-            check_error(&self.gl_context, "get_native_client_buffer");
-
-            let image = (self.create_image)(
-                self.egl_display.as_ptr(),
-                egl::NO_CONTEXT,
-                EGL_NATIVE_BUFFER_ANDROID,
-                client_buffer,
-                ptr::null(),
-            );
-            check_error(&self.gl_context, "create_image");
-
-            self.gl_context
-                .bind_texture(GL_TEXTURE_EXTERNAL_OES, Some(texture));
-            check_error(&self.gl_context, "bind texture OES");
-
-            (self.image_target_texture_2d)(GL_TEXTURE_EXTERNAL_OES, image);
-            check_error(&self.gl_context, "image_target_texture_2d");
-
+        if let Some(imported_buffer) = self.import_ahardwarebuffer_to_texture(buffer, texture) {
             render_cb();
-
-            (self.destroy_image)(self.egl_display.as_ptr(), image);
-            check_error(&self.gl_context, "destroy_image");
+            self.release_imported_hardware_buffer(imported_buffer);
         }
     }
 }

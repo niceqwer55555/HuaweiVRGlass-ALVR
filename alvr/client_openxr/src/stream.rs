@@ -116,6 +116,7 @@ struct StreamInputState {
     last_controller_poses: [Pose; 2],
     last_palm_poses: [Pose; 2],
     last_view_params: [ViewParams; 2],
+    view_config_sent: bool,
 }
 
 enum StreamRendererBackend {
@@ -681,6 +682,7 @@ fn poll_stream_inputs(
         now,
         target_time,
         &state.last_view_params,
+        !state.view_config_sent,
     ) else {
         return Ok(());
     };
@@ -688,6 +690,7 @@ fn poll_stream_inputs(
     if let Some(views) = local_views {
         core_ctx.send_view_params(views);
         state.last_view_params = views;
+        state.view_config_sent = true;
     }
 
     let mut device_motions = Vec::with_capacity(3);

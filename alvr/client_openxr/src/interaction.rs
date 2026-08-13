@@ -22,6 +22,7 @@ use std::{collections::HashMap, time::Duration};
 use xr::SpaceLocationFlags;
 
 const IPD_CHANGE_EPS: f32 = 0.001;
+const FOV_CHANGE_EPS: f32 = 0.001;
 
 // Most OpenXR runtime, including Meta's one, do not follow perfectly the specification regarding
 // controller pose. The Z axis should point down through the center of the controller grip, the X
@@ -858,6 +859,7 @@ pub fn get_head_data(
     time: Duration,
     future_time: Duration,
     last_view_params: &[ViewParams; 2],
+    force_view_params_update: bool,
 ) -> Option<(DeviceMotion, Option<[ViewParams; 2]>)> {
     let xr_time = crate::to_xr_time(time);
 
@@ -942,17 +944,46 @@ pub fn get_head_data(
         .distance(last_view_params[1].pose.position);
     let current_ipd_m = crate::from_xr_vec3(views[1].pose.position)
         .distance(crate::from_xr_vec3(views[0].pose.position));
-    let view_params = if f32::abs(current_ipd_m - last_ipd_m) > IPD_CHANGE_EPS {
-        Some([
-            ViewParams {
-                pose: motion.pose.inverse() * crate::from_xr_pose(views[0].pose),
-                fov: crate::from_xr_fov(views[0].fov),
-            },
-            ViewParams {
-                pose: motion.pose.inverse() * crate::from_xr_pose(views[1].pose),
-                fov: crate::from_xr_fov(views[1].fov),
-            },
-        ])
+    let current_view_params = [
+        ViewParams {
+            pose: motion.pose.inverse() * crate::from_xr_pose(views[0].pose),
+            fov: crate::from_xr_fov(views[0].fov),
+        },
+        ViewParams {
+            pose: motion.pose.inverse() * crate::from_xr_pose(views[1].pose),
+            fov: crate::from_xr_fov(views[1].fov),
+        },
+    ];
+    let fov_changed =
+        current_view_params
+            .iter()
+            .zip(last_view_params)
+            .any(|(current, previous)| {
+                (current.fov.left - previous.fov.left).abs() > FOV_CHANGE_EPS
+                    || (current.fov.right - previous.fov.right).abs() > FOV_CHANGE_EPS
+                    || (current.fov.up - previous.fov.up).abs() > FOV_CHANGE_EPS
+                    || (current.fov.down - previous.fov.down).abs() > FOV_CHANGE_EPS
+            });
+    let view_params = if force_view_params_update
+        || f32::abs(current_ipd_m - last_ipd_m) > IPD_CHANGE_EPS
+        || fov_changed
+    {
+        if platform.is_huawei() && force_view_params_update {
+            warn!(
+                "[HVR-DIAG] Huawei view config: ipd={:.3} mm, left_fov=[{:.2}, {:.2}, {:.2}, {:.2}] deg, right_fov=[{:.2}, {:.2}, {:.2}, {:.2}] deg",
+                current_ipd_m * 1000.0,
+                current_view_params[0].fov.left.to_degrees(),
+                current_view_params[0].fov.right.to_degrees(),
+                current_view_params[0].fov.up.to_degrees(),
+                current_view_params[0].fov.down.to_degrees(),
+                current_view_params[1].fov.left.to_degrees(),
+                current_view_params[1].fov.right.to_degrees(),
+                current_view_params[1].fov.up.to_degrees(),
+                current_view_params[1].fov.down.to_degrees(),
+            );
+        }
+
+        Some(current_view_params)
     } else {
         None
     };

@@ -1,4 +1,6 @@
-use super::{ck, staging::create_program, GraphicsContext, GL_TEXTURE_EXTERNAL_OES};
+use super::{
+    ck, staging::create_program, GraphicsContext, ImportedHardwareBuffer, GL_TEXTURE_EXTERNAL_OES,
+};
 use alvr_common::{glam::UVec2, info};
 use glow::{self as gl, HasContext};
 use std::{cell::Cell, ffi::c_void, rc::Rc};
@@ -70,6 +72,7 @@ pub struct HuaweiStreamRenderer {
     view_resolution: UVec2,
     fix_limited_range: bool,
     resources: std::cell::RefCell<Option<HuaweiStreamResources>>,
+    imported_frame: std::cell::RefCell<Option<ImportedHardwareBuffer>>,
     entered_eyes: Cell<u8>,
     gl_ready_eyes: Cell<u8>,
     logged_eyes: Cell<u8>,
@@ -86,6 +89,7 @@ impl HuaweiStreamRenderer {
             view_resolution,
             fix_limited_range,
             resources: std::cell::RefCell::new(None),
+            imported_frame: std::cell::RefCell::new(None),
             entered_eyes: Cell::new(0),
             gl_ready_eyes: Cell::new(0),
             logged_eyes: Cell::new(0),
@@ -161,6 +165,12 @@ impl HuaweiStreamRenderer {
         );
         gl.color_mask(true, true, true, true);
 
+        if eye == 0 {
+            if let Some(stale_import) = self.imported_frame.borrow_mut().take() {
+                self.context.release_imported_hardware_buffer(stale_import);
+            }
+        }
+
         if hardware_buffer.is_null() {
             gl.clear_color(0.02, 0.24, 0.32, 1.0);
             gl.clear(gl::COLOR_BUFFER_BIT);
@@ -169,21 +179,31 @@ impl HuaweiStreamRenderer {
             let resources = self.resources.borrow();
             let resources = resources.as_ref().unwrap();
 
-            self.context.render_ahardwarebuffer_using_texture(
-                hardware_buffer,
-                resources.surface_texture,
-                || unsafe {
-                    ck!(gl.use_program(Some(resources.program)));
-                    ck!(gl.active_texture(gl::TEXTURE0));
-                    ck!(gl.bind_texture(GL_TEXTURE_EXTERNAL_OES, Some(resources.surface_texture)));
-                    ck!(gl.bind_sampler(0, None));
-                    ck!(gl.uniform_1_i32(Some(&resources.view_idx_uloc), eye as i32));
-                    ck!(gl.draw_arrays(gl::TRIANGLE_STRIP, 0, 4));
-                },
-            );
+            if self.imported_frame.borrow().is_none() {
+                self.imported_frame.replace(
+                    self.context.import_ahardwarebuffer_to_texture(
+                        hardware_buffer,
+                        resources.surface_texture,
+                    ),
+                );
+            }
+
+            ck!(gl.use_program(Some(resources.program)));
+            ck!(gl.active_texture(gl::TEXTURE0));
+            ck!(gl.bind_texture(GL_TEXTURE_EXTERNAL_OES, Some(resources.surface_texture)));
+            ck!(gl.bind_sampler(0, None));
+            ck!(gl.uniform_1_i32(Some(&resources.view_idx_uloc), eye as i32));
+            ck!(gl.draw_arrays(gl::TRIANGLE_STRIP, 0, 4));
         }
 
         gl.flush();
+
+        if eye == 1 {
+            if let Some(imported_frame) = self.imported_frame.borrow_mut().take() {
+                self.context
+                    .release_imported_hardware_buffer(imported_frame);
+            }
+        }
 
         let gl_error = gl.get_error();
         if self.logged_eyes.get() & eye_bit == 0 {
