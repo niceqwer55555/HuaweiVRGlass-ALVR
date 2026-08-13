@@ -2,6 +2,8 @@
 
 # ALVR - Air Light VR
 
+> 本仓库是面向 Huawei VR Glass 的非官方专版，包含鸿蒙 4.2/Android 10 客户端、中文 PC 端和华为旧版 OpenXR Runtime 兼容修复。专版说明、构建方法与已验证状态见 [HUAWEI_VR_GLASS.md](HUAWEI_VR_GLASS.md)。
+
 [![badge-discord][]][link-discord] [![badge-matrix][]][link-matrix] [![badge-opencollective][]][link-opencollective]
 
 Stream VR games from your PC to your headset via Wi-Fi.
