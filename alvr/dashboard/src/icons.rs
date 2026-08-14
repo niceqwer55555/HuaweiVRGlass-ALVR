@@ -1,15 +1,15 @@
-use eframe::egui::{
-    text::LayoutJob, Align, Color32, FontFamily, FontSelection, RichText, Style, WidgetText,
-};
+use eframe::egui::{Color32, FontFamily, RichText};
 
 // Material Symbols Sharp codepoints from Google's Apache-2.0-licensed icon set.
 // The embedded font is subset to only the glyphs referenced by this module.
 pub const FAMILY_NAME: &str = "material_symbols_sharp";
 
 pub const PLAY_ARROW: &str = "\u{e037}";
+pub const REMOVE: &str = "\u{e15b}";
 pub const DEVICES: &str = "\u{e326}";
-pub const LIGHT_MODE: &str = "\u{e518}";
-pub const DARK_MODE: &str = "\u{e51c}";
+pub const CROP_SQUARE: &str = "\u{e3c6}";
+pub const FILTER_NONE: &str = "\u{e3e0}";
+pub const MENU: &str = "\u{e5d2}";
 pub const REFRESH: &str = "\u{e5d5}";
 pub const CLOSE: &str = "\u{e5cd}";
 pub const RADIO_BUTTON_CHECKED: &str = "\u{e837}";
@@ -38,40 +38,4 @@ pub fn symbol(glyph: &str, size: f32, color: Color32) -> RichText {
 
 pub fn symbol_auto(glyph: &str, size: f32) -> RichText {
     RichText::new(glyph).family(family()).size(size)
-}
-
-pub fn label(style: &Style, glyph: &str, text: &str, size: f32) -> WidgetText {
-    label_impl(style, glyph, text, size, None)
-}
-
-pub fn label_colored(
-    style: &Style,
-    glyph: &str,
-    text: &str,
-    size: f32,
-    color: Color32,
-) -> WidgetText {
-    label_impl(style, glyph, text, size, Some(color))
-}
-
-fn label_impl(
-    style: &Style,
-    glyph: &str,
-    text: &str,
-    size: f32,
-    color: Option<Color32>,
-) -> WidgetText {
-    let mut job = LayoutJob::default();
-
-    let mut icon = RichText::new(glyph).family(family()).size(size + 3.0);
-    let mut label = RichText::new(format!("  {text}")).size(size);
-    if let Some(color) = color {
-        icon = icon.color(color);
-        label = label.color(color);
-    }
-
-    icon.append_to(&mut job, style, FontSelection::Default, Align::Center);
-    label.append_to(&mut job, style, FontSelection::Default, Align::Center);
-
-    job.into()
 }

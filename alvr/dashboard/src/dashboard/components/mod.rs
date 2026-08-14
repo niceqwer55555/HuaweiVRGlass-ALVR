@@ -1,4 +1,5 @@
 mod about;
+mod appearance;
 mod debug;
 mod devices;
 mod logs;
@@ -13,6 +14,7 @@ mod statistics;
 mod installation;
 
 pub use about::*;
+pub use appearance::*;
 pub use debug::*;
 pub use devices::*;
 pub use logs::*;

@@ -5,7 +5,7 @@ use alvr_packets::ClientListAction;
 use alvr_session::{ClientConnectionConfig, SessionConfig};
 use alvr_sockets::WIRED_CLIENT_HOSTNAME;
 use eframe::{
-    egui::{self, Frame, Grid, Layout, ProgressBar, RichText, TextEdit, Ui, Window},
+    egui::{self, Grid, Layout, ProgressBar, RichText, TextEdit, Ui, Window},
     emath::{Align, Align2},
     epaint::Color32,
 };
@@ -57,7 +57,7 @@ impl DevicesTab {
         }
 
         if !connected_to_server {
-            Frame::group(ui.style())
+            theme::card_frame(ui.ctx())
                 .fill(log_colors::WARNING_LIGHT)
                 .show(ui, |ui| {
                     Grid::new(0).num_columns(2).show(ui, |ui| {
@@ -191,7 +191,7 @@ fn wired_client_section(
 ) -> Option<ServerRequest> {
     let mut request = None;
 
-    Frame::group(ui.style())
+    theme::card_frame(ui.ctx())
         .fill(theme::palette(ui.ctx()).surface)
         .inner_margin(egui::vec2(15.0, 12.0))
         .show(ui, |ui| {
@@ -250,7 +250,7 @@ fn new_clients_section(
 ) -> Option<ServerRequest> {
     let mut request = None;
 
-    Frame::group(ui.style())
+    theme::card_frame(ui.ctx())
         .fill(theme::palette(ui.ctx()).surface)
         .show(ui, |ui| {
             ui.vertical_centered_justified(|ui| {
@@ -269,7 +269,7 @@ fn new_clients_section(
                 }
             });
             for (hostname, _) in clients {
-                Frame::group(ui.style())
+                theme::card_frame(ui.ctx())
                     .fill(theme::palette(ui.ctx()).inset_surface)
                     .inner_margin(egui::vec2(15.0, 12.0))
                     .show(ui, |ui| {
@@ -304,7 +304,7 @@ fn trusted_clients_section(
 ) -> Option<ServerRequest> {
     let mut request = None;
 
-    Frame::group(ui.style())
+    theme::card_frame(ui.ctx())
         .fill(theme::palette(ui.ctx()).surface)
         .show(ui, |ui| {
             Grid::new(0).num_columns(2).show(ui, |ui| {
@@ -325,7 +325,7 @@ fn trusted_clients_section(
             });
 
             for (hostname, data) in clients {
-                Frame::group(ui.style())
+                theme::card_frame(ui.ctx())
                     .fill(theme::palette(ui.ctx()).inset_surface)
                     .inner_margin(egui::vec2(15.0, 12.0))
                     .show(ui, |ui| {

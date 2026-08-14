@@ -1,6 +1,6 @@
 use alvr_common::ALVR_VERSION;
 use alvr_gui_common::theme;
-use eframe::egui::{self, Frame, RichText, ScrollArea, Ui};
+use eframe::egui::{self, RichText, ScrollArea, Ui};
 
 pub fn about_tab_ui(ui: &mut Ui) {
     ui.label(RichText::new(format!("ALVR 华为 VR Glass 串流专版 v{}", *ALVR_VERSION)).size(26.0));
@@ -25,7 +25,7 @@ pub fn about_tab_ui(ui: &mut Ui) {
     );
     ui.add_space(10.0);
     ui.label("许可证：");
-    Frame::group(ui.style())
+    theme::card_frame(ui.ctx())
         .fill(theme::palette(ui.ctx()).inset_surface)
         .inner_margin(egui::vec2(15.0, 12.0))
         .show(ui, |ui| {

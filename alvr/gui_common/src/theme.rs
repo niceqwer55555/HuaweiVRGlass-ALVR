@@ -1,4 +1,7 @@
-use egui::{self, Color32, Context, CornerRadius, Stroke, TextStyle, ThemePreference, Visuals};
+use egui::{
+    self, Color32, Context, CornerRadius, Frame, Shadow, Stroke, TextStyle, ThemePreference,
+    Visuals,
+};
 
 // Material Design 2 brand colors. The primary highlight is fixed to the user-selected #038387.
 pub const ACCENT: Color32 = Color32::from_rgb(3, 131, 135);
@@ -74,6 +77,44 @@ pub fn palette(ctx: &Context) -> Palette {
     palette_for(ctx.style().visuals.dark_mode)
 }
 
+/// Material Design 2 elevation 2, softened to match the KIGTTS desktop UI.
+pub fn material_shadow(ctx: &Context) -> Shadow {
+    Shadow {
+        offset: [0, 2],
+        blur: 8,
+        spread: 0,
+        color: if ctx.style().visuals.dark_mode {
+            Color32::from_black_alpha(52)
+        } else {
+            Color32::from_black_alpha(36)
+        },
+    }
+}
+
+/// Low elevation for the fixed app bar. It avoids a hard divider in light mode.
+pub fn app_bar_shadow(ctx: &Context) -> Shadow {
+    Shadow {
+        offset: [0, 1],
+        blur: 4,
+        spread: 0,
+        color: if ctx.style().visuals.dark_mode {
+            Color32::from_black_alpha(32)
+        } else {
+            Color32::from_black_alpha(18)
+        },
+    }
+}
+
+/// Standard Dashboard card: raised surface without an outline.
+pub fn card_frame(ctx: &Context) -> Frame {
+    Frame::new()
+        .fill(palette(ctx).surface)
+        .stroke(Stroke::NONE)
+        .corner_radius(4.0)
+        .inner_margin(12.0)
+        .shadow(material_shadow(ctx))
+}
+
 pub mod log_colors {
     use egui::epaint::Color32;
 
@@ -113,6 +154,21 @@ pub fn set_theme(ctx: &Context) {
 }
 
 pub fn set_theme_mode(ctx: &Context, dark_mode: bool) {
+    set_theme_preference(
+        ctx,
+        if dark_mode {
+            ThemePreference::Dark
+        } else {
+            ThemePreference::Light
+        },
+        dark_mode,
+    );
+}
+
+pub fn set_theme_preference(ctx: &Context, preference: ThemePreference, resolved_dark_mode: bool) {
+    ctx.set_theme(preference);
+
+    let dark_mode = resolved_dark_mode;
     ctx.set_theme(if dark_mode {
         ThemePreference::Dark
     } else {
@@ -185,6 +241,7 @@ pub fn set_theme_mode(ctx: &Context, dark_mode: bool) {
     visuals.widgets.noninteractive.corner_radius = corner_radius;
 
     ctx.set_visuals(visuals);
+    ctx.set_theme(preference);
 }
 
 #[cfg(test)]
@@ -204,5 +261,17 @@ mod tests {
         assert_ne!(light.background, dark.background);
         assert_eq!(light.accent, ACCENT);
         assert_eq!(dark.accent, ACCENT);
+    }
+
+    #[test]
+    fn dashboard_card_uses_elevation_without_outline() {
+        let context = Context::default();
+        set_theme_mode(&context, false);
+
+        let card = card_frame(&context);
+
+        assert_eq!(card.stroke, Stroke::NONE);
+        assert_eq!(card.fill, palette_for(false).surface);
+        assert_ne!(card.shadow, Shadow::NONE);
     }
 }

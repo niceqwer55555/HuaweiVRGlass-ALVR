@@ -126,7 +126,8 @@ impl NotificationBar {
             Frame::default()
                 .inner_margin(egui::vec2(10.0, 5.0))
                 .fill(bg)
-                .stroke(Stroke::new(1.0, palette.separator)),
+                .stroke(Stroke::NONE)
+                .shadow(theme::material_shadow(context)),
         );
         let alignment = if !self.expanded {
             bottom_bar = bottom_bar.max_height(26.0);

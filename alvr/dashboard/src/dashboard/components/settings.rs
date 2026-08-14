@@ -1,11 +1,12 @@
 use super::{
+    appearance_theme_ui,
     presets::{builtin_schema, PresetControl},
     NestingInfo, SettingControl,
 };
-use crate::dashboard::ServerRequest;
+use crate::dashboard::{DashboardTheme, ServerRequest};
 use alvr_gui_common::{theme, DisplayString};
 use alvr_session::{SessionSettings, Settings};
-use eframe::egui::{self, Align, Frame, Grid, Layout, RichText, ScrollArea, Ui};
+use eframe::egui::{self, Align, Grid, Layout, RichText, ScrollArea, Ui};
 #[cfg(target_arch = "wasm32")]
 use instant::Instant;
 use serde_json as json;
@@ -109,7 +110,7 @@ impl SettingsTab {
         self.session_settings_json = Some(settings_json);
     }
 
-    pub fn ui(&mut self, ui: &mut Ui) -> Vec<ServerRequest> {
+    pub fn ui(&mut self, ui: &mut Ui, dashboard_theme: &mut DashboardTheme) -> Vec<ServerRequest> {
         let mut requests = vec![];
 
         let now = Instant::now();
@@ -123,11 +124,16 @@ impl SettingsTab {
 
         let mut path_value_pairs = vec![];
         ui.with_layout(Layout::left_to_right(Align::Min), |ui| {
-            Frame::group(ui.style())
+            theme::card_frame(ui.ctx())
                 .fill(theme::palette(ui.ctx()).inset_surface)
                 .inner_margin(egui::vec2(15.0, 12.0))
                 .show(ui, |ui| {
                     ui.horizontal_wrapped(|ui| {
+                        ui.selectable_value(
+                            &mut self.selected_top_tab_id,
+                            "appearance".into(),
+                            RichText::new("外观").raised().size(15.0),
+                        );
                         ui.selectable_value(
                             &mut self.selected_top_tab_id,
                             "presets".into(),
@@ -144,7 +150,14 @@ impl SettingsTab {
                 })
         });
 
-        if self.selected_top_tab_id == "presets" {
+        if self.selected_top_tab_id == "appearance" {
+            ScrollArea::new([false, true])
+                .id_salt("appearance_scroll")
+                .show(ui, |ui| {
+                    ui.add_space(8.0);
+                    appearance_theme_ui(ui, dashboard_theme);
+                });
+        } else if self.selected_top_tab_id == "presets" {
             ScrollArea::new([false, true])
                 .id_salt("presets_scroll")
                 .show(ui, |ui| {

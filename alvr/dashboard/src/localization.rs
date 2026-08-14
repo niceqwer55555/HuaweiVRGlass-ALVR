@@ -24,7 +24,7 @@ pub fn install_chinese_font(context: &Context) {
     );
     fonts.families.insert(
         crate::icons::family(),
-        vec![crate::icons::FAMILY_NAME.into()],
+        vec![crate::icons::FAMILY_NAME.into(), "noto_sans_cjk_sc".into()],
     );
 
     for family in [FontFamily::Proportional, FontFamily::Monospace] {

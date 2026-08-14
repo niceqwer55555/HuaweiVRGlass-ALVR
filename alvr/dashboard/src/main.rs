@@ -80,6 +80,7 @@ fn main() {
                 .with_app_id("alvr.dashboard")
                 .with_inner_size((980.0, 660.0))
                 .with_min_inner_size((860.0, 560.0))
+                .with_decorations(false)
                 .with_icon(IconData {
                     rgba: image.rgba_data().to_owned(),
                     width: image.width(),

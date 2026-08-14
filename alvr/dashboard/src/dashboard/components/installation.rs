@@ -1,7 +1,7 @@
 use alvr_gui_common::theme;
 use alvr_packets::{FirewallRulesAction, ServerRequest};
 use eframe::{
-    egui::{Frame, Grid, Layout, RichText, Ui},
+    egui::{Grid, Layout, RichText, Ui},
     emath::Align,
 };
 use std::{
@@ -62,7 +62,7 @@ impl InstallationTab {
                 }
             });
 
-            Frame::group(ui.style())
+            theme::card_frame(ui.ctx())
                 .fill(theme::palette(ui.ctx()).surface)
                 .show(ui, |ui| {
                     ui.vertical_centered(|ui| {
