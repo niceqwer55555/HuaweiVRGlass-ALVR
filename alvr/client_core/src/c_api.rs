@@ -947,6 +947,7 @@ pub extern "C" fn alvr_create_decoder(config: AlvrDecoderConfig) {
             AlvrCodec::AV1 => CodecType::AV1,
         },
         force_software_decoder: config.force_software_decoder,
+        use_hisi_decoder: false,
         max_buffering_frames: config.max_buffering_frames,
         buffering_history_weight: config.buffering_history_weight,
         image_reader_max_images: 10,

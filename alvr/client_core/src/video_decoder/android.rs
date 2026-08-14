@@ -26,6 +26,8 @@ use std::{
     time::Duration,
 };
 
+mod hisi;
+
 struct FakeThreadSafe<T>(T);
 unsafe impl<T> Send for FakeThreadSafe<T> {}
 unsafe impl<T> Sync for FakeThreadSafe<T> {}
@@ -240,6 +242,7 @@ fn mime_for_codec(codec: CodecType) -> &'static str {
 fn decoder_attempt_setup(
     codec_type: CodecType,
     is_software: bool,
+    use_hisi_decoder: bool,
     format: &MediaFormat,
     image_reader: &ImageReader,
 ) -> Result<MediaCodec> {
@@ -251,6 +254,9 @@ fn decoder_attempt_setup(
         };
         MediaCodec::from_codec_name(&sw_codec_name)
             .ok_or(anyhow!("no such codec: {}", &sw_codec_name))?
+    } else if use_hisi_decoder {
+        MediaCodec::from_codec_name(hisi::AVC_DECODER_NAME)
+            .ok_or(anyhow!("no such codec: {}", hisi::AVC_DECODER_NAME))?
     } else {
         let mime = mime_for_codec(codec_type);
         MediaCodec::from_decoder_type(&mime)
@@ -269,6 +275,33 @@ fn decoder_attempt_setup(
         .with_context(|| format!("failed to start decoder"))?;
 
     Ok(decoder)
+}
+
+fn create_base_media_format(config: &VideoDecoderConfig, csd_0: &[u8]) -> MediaFormat {
+    let mut format = MediaFormat::new();
+    format.set_str("mime", mime_for_codec(config.codec));
+
+    if let Some((width, height)) = config.configured_frame_size {
+        let width = width as i32;
+        let height = height as i32;
+
+        // Huawei's Android 10 C2 decoder fails while reconnecting its output Surface when the
+        // dummy 512x1024 format changes to the real stream size. Configure the negotiated encoded
+        // size up front and make the buffer-pool limit explicit so no dynamic resize is required.
+        format.set_i32("width", width);
+        format.set_i32("height", height);
+        format.set_i32("max-width", width);
+        format.set_i32("max-height", height);
+    } else {
+        // Given https://github.com/alvr-org/ALVR/pull/1933#discussion_r1431902906 - change at own risk.
+        // It might be harmless, it might not be, but it's definitely a risk.
+        format.set_i32("width", 512);
+        format.set_i32("height", 1024);
+    }
+
+    format.set_buffer("csd-0", csd_0);
+
+    format
 }
 
 // Since we leak the ImageReader, and we pass frame_result_callback to it which contains a reference
@@ -349,68 +382,81 @@ fn decoder_lifecycle(
     // todo: find out how to use it and avoid leaking the ImageReader
     image_reader.set_buffer_removed_listener(Box::new(|_, _| ()))?;
 
-    let mime = mime_for_codec(config.codec);
+    let mut format = create_base_media_format(&config, &csd_0);
 
-    let mut format = MediaFormat::new();
-    format.set_str("mime", mime);
-    if let Some((width, height)) = config.configured_frame_size {
-        let width = width as i32;
-        let height = height as i32;
-
-        // Huawei's Android 10 C2 decoder fails while reconnecting its output Surface when the
-        // dummy 512x1024 format changes to the real stream size. Configure the negotiated encoded
-        // size up front and make the buffer-pool limit explicit so no dynamic resize is required.
-        format.set_i32("width", width);
-        format.set_i32("height", height);
-        format.set_i32("max-width", width);
-        format.set_i32("max-height", height);
+    if config.use_hisi_decoder {
+        // ALVR's generic Android defaults include Qualcomm vendor keys and an unbounded
+        // operating-rate. Keep them away from the old HiSilicon OMX component.
+        if !config.options.is_empty() {
+            info!(
+                "[HVR-HISI] Ignoring {} generic MediaCodec options for the dedicated HiSilicon profile",
+                config.options.len()
+            );
+        }
+        warn!(
+            "[HVR-HISI] Requesting dedicated H.264 decoder {}",
+            hisi::AVC_DECODER_NAME
+        );
     } else {
-        // Given https://github.com/alvr-org/ALVR/pull/1933#discussion_r1431902906 - change at own risk.
-        // It might be harmless, it might not be, but it's definitely a risk.
-        format.set_i32("width", 512);
-        format.set_i32("height", 1024);
-    }
-    format.set_buffer("csd-0", &csd_0);
+        for (key, prop) in &config.options {
+            let maybe_error = match prop.ty {
+                MediacodecPropType::Float => prop
+                    .value
+                    .parse()
+                    .map(|value| format.set_f32(key, value))
+                    .to_any(),
+                MediacodecPropType::Int32 => prop
+                    .value
+                    .parse()
+                    .map(|value| format.set_i32(key, value))
+                    .to_any(),
+                MediacodecPropType::Int64 => prop
+                    .value
+                    .parse()
+                    .map(|value| format.set_i64(key, value))
+                    .to_any(),
+                MediacodecPropType::String => Ok(format.set_str(key, &prop.value)),
+            };
 
-    for (key, prop) in &config.options {
-        let maybe_error = match prop.ty {
-            MediacodecPropType::Float => prop
-                .value
-                .parse()
-                .map(|value| format.set_f32(key, value))
-                .to_any(),
-            MediacodecPropType::Int32 => prop
-                .value
-                .parse()
-                .map(|value| format.set_i32(key, value))
-                .to_any(),
-            MediacodecPropType::Int64 => prop
-                .value
-                .parse()
-                .map(|value| format.set_i64(key, value))
-                .to_any(),
-            MediacodecPropType::String => Ok(format.set_str(key, &prop.value)),
-        };
-
-        if let Err(e) = maybe_error {
-            error!("Failed to set property {key} to {}: {e}", prop.value);
+            if let Err(e) = maybe_error {
+                error!("Failed to set property {key} to {}: {e}", prop.value);
+            }
         }
     }
 
     info!("Using AMediaCodec format:{} ", format);
 
     let decoder = if config.force_software_decoder {
-        decoder_attempt_setup(config.codec, true, &format, &image_reader)?
+        decoder_attempt_setup(config.codec, true, false, &format, &image_reader)?
+    } else if config.use_hisi_decoder {
+        match decoder_attempt_setup(config.codec, false, true, &format, &image_reader) {
+            Ok(decoder) => {
+                warn!("[HVR-HISI] Started {}", hisi::AVC_DECODER_NAME);
+                decoder
+            }
+            Err(hisi_error) => {
+                error!(
+                    "Attempting software fallback after HiSilicon decoder startup failed: {hisi_error:#}"
+                );
+                decoder_attempt_setup(config.codec, true, false, &format, &image_reader)?
+            }
+        }
     } else {
         // Hardware decoders sometimes fail at the CSD-0.
         // May as well fall back if this occurs.
-        match decoder_attempt_setup(config.codec, false, &format, &image_reader) {
+        match decoder_attempt_setup(
+            config.codec,
+            false,
+            config.use_hisi_decoder,
+            &format,
+            &image_reader,
+        ) {
             Ok(d) => d,
             Err(e) => {
                 // would be "warn!" but this is a severe caveat and a pretty major error.
                 error!("Attempting software fallback due to error in default decoder: {e:#}");
 
-                decoder_attempt_setup(config.codec, true, &format, &image_reader)?
+                decoder_attempt_setup(config.codec, true, false, &format, &image_reader)?
             }
         }
     };
@@ -428,7 +474,13 @@ fn decoder_lifecycle(
     let mut error_counter = 0;
     let mut logged_first_output_buffer = false;
     while running.value() {
-        match decoder.dequeue_output_buffer(Duration::from_millis(1)) {
+        let dequeue_timeout = if config.use_hisi_decoder {
+            hisi::OUTPUT_DEQUEUE_TIMEOUT
+        } else {
+            Duration::from_millis(1)
+        };
+
+        match decoder.dequeue_output_buffer(dequeue_timeout) {
             Ok(DequeuedOutputBufferInfoResult::Buffer(buffer)) => {
                 // The buffer timestamp is actually nanoseconds
                 let presentation_time_ns = buffer.info().presentation_time_us();

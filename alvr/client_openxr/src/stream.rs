@@ -356,6 +356,9 @@ impl StreamContext {
     }
 
     pub fn maybe_initialize_decoder(&mut self, codec: CodecType, config_nal: Vec<u8>) {
+        let use_hisi_decoder = self.platform.is_huawei()
+            && codec == CodecType::H264
+            && !self.config.force_software_decoder;
         let configured_frame_size = self.platform.is_huawei().then(|| {
             let encoded_view_resolution = self
                 .config
@@ -378,16 +381,16 @@ impl StreamContext {
 
         let new_config = VideoDecoderConfig {
             codec,
-            // Huawei's OMX H.264 decoder accepts the stream but reports frame-gap/DPB
-            // corruption and renders garbled frames. Keep the previously working
-            // software path until the vendor bitstream constraints are understood.
-            force_software_decoder: self.config.force_software_decoder || self.platform.is_huawei(),
+            force_software_decoder: self.config.force_software_decoder,
+            use_hisi_decoder,
             max_buffering_frames: self.config.max_buffering_frames,
             buffering_history_weight: self.config.buffering_history_weight,
-            image_reader_max_images: 10,
+            // HiSilicon's AVC output pool is much smaller than the software C2 decoder's. Three
+            // slots leave one retained frame and two slots for acquiring/discarding stale frames.
+            image_reader_max_images: if use_hisi_decoder { 3 } else { 10 },
             prefer_latest_frame: false,
             retain_last_frame: self.platform.is_huawei(),
-            render_output_immediately: false,
+            render_output_immediately: use_hisi_decoder,
             configured_frame_size,
             options: self.config.decoder_options.clone(),
             config_buffer: config_nal,

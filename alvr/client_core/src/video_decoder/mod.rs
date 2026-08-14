@@ -9,6 +9,7 @@ use std::time::Duration;
 pub struct VideoDecoderConfig {
     pub codec: CodecType,
     pub force_software_decoder: bool,
+    pub use_hisi_decoder: bool,
     pub max_buffering_frames: f32,
     pub buffering_history_weight: f32,
     pub image_reader_max_images: usize,
