@@ -297,6 +297,7 @@ dependencies = [
  "eframe",
  "env_logger",
  "ico",
+ "image",
  "nvml-wrapper",
  "rand 0.9.0",
  "serde",

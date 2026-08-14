@@ -3,7 +3,7 @@ use crate::icons;
 use alvr_gui_common::theme::{self, Palette};
 use eframe::egui::{
     self, Align, Align2, Color32, FontId, Frame, Layout, Margin, Response, RichText, Sense,
-    SidePanel, Stroke, TopBottomPanel, Ui,
+    SidePanel, Stroke, TextureHandle, TopBottomPanel, Ui,
 };
 
 const TITLE_BAR_HEIGHT: f32 = 48.0;
@@ -33,6 +33,7 @@ pub enum NavigationAction {
 
 pub fn show_title_bar(
     context: &egui::Context,
+    logo: &TextureHandle,
     expanded: bool,
     connected_to_server: bool,
     palette: Palette,
@@ -70,7 +71,7 @@ pub fn show_title_bar(
                 }
 
                 ui.add_space(10.0);
-                ui.label(icons::symbol(icons::VIEW_IN_AR, 24.0, palette.accent));
+                ui.add(egui::Image::new((logo.id(), egui::vec2(24.0, 24.0))));
                 ui.add_space(8.0);
                 ui.label(
                     RichText::new("ALVR 华为专版")

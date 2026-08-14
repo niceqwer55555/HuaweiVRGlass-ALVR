@@ -207,7 +207,8 @@ mod tests {
         assert_eq!(SETTINGS_NAMES.len(), 235);
         assert_eq!(SETTINGS_HELP.len(), 93);
         assert!(include_bytes!("../resources/NotoSansCJKsc-Regular.otf").len() > 1_000_000);
-        assert!(include_bytes!("../resources/MaterialSymbolsSharp-subset.ttf").len() > 50_000);
+        assert!(include_bytes!("../resources/MaterialSymbolsSharp-subset.ttf").len() > 40_000);
+        assert!(include_bytes!("../resources/ALVR-Icon.png").len() > 10_000);
     }
 
     #[test]

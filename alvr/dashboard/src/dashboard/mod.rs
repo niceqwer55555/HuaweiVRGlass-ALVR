@@ -124,6 +124,7 @@ pub struct Dashboard {
     just_opened: bool,
     server_restarting: Arc<Mutex<bool>>,
     server_restarting_condvar: Arc<Condvar>,
+    title_bar_logo: egui::TextureHandle,
     theme: DashboardTheme,
     applied_dark_mode: bool,
     drawer_expanded: bool,
@@ -164,6 +165,7 @@ impl Dashboard {
             applied_dark_mode,
         );
         crate::localization::install_chinese_font(&creation_context.egui_ctx);
+        let title_bar_logo = icons::load_alvr_logo(&creation_context.egui_ctx);
 
         data_sources.request(ServerRequest::GetSession);
 
@@ -172,6 +174,7 @@ impl Dashboard {
             just_opened: true,
             server_restarting: Arc::new(Mutex::new(false)),
             server_restarting_condvar: Arc::new(Condvar::new()),
+            title_bar_logo,
             theme: dashboard_theme,
             applied_dark_mode,
             drawer_expanded,
@@ -295,9 +298,13 @@ impl eframe::App for Dashboard {
             }
         }
 
-        for action in
-            drawer::show_title_bar(context, self.drawer_expanded, connected_to_server, palette)
-        {
+        for action in drawer::show_title_bar(
+            context,
+            &self.title_bar_logo,
+            self.drawer_expanded,
+            connected_to_server,
+            palette,
+        ) {
             match action {
                 drawer::TitleBarAction::ToggleExpanded => {
                     self.drawer_expanded = !self.drawer_expanded;
