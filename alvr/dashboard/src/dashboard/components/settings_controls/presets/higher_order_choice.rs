@@ -1,10 +1,13 @@
 use std::collections::{HashMap, HashSet};
 
 use super::schema::{HigherOrderChoiceSchema, PresetModifierOperation};
-use crate::dashboard::components::{self, notice, NestingInfo, SettingControl, INDENTATION_STEP};
+use crate::{
+    dashboard::components::{self, notice, NestingInfo, SettingControl, INDENTATION_STEP},
+    icons,
+};
 use alvr_gui_common::theme::{
+    self,
     log_colors::{INFO_LIGHT, WARNING_LIGHT},
-    OK_GREEN,
 };
 use alvr_packets::{PathSegment, PathValuePair};
 use eframe::egui::Ui;
@@ -152,11 +155,18 @@ impl Control {
             ui.label(&self.name);
 
             if let Some(string) = &self.help {
-                if ui.colored_label(INFO_LIGHT, "❓").hovered() {
+                if ui
+                    .label(icons::symbol(icons::HELP, 17.0, INFO_LIGHT))
+                    .hovered()
+                {
                     alvr_gui_common::tooltip(ui, &format!("{}_help_tooltip", self.name), string);
                 }
             }
-            if self.steamvr_restart_flag && ui.colored_label(WARNING_LIGHT, "⚠").hovered() {
+            if self.steamvr_restart_flag
+                && ui
+                    .label(icons::symbol(icons::WARNING, 17.0, WARNING_LIGHT))
+                    .hovered()
+            {
                 alvr_gui_common::tooltip(
                     ui,
                     "steamvr_restart_tooltip",
@@ -164,8 +174,15 @@ impl Control {
                 );
             }
 
-            // The emoji is blue but it will be green in the UI
-            if self.real_time_flag && ui.colored_label(OK_GREEN, "🔵").hovered() {
+            if self.real_time_flag
+                && ui
+                    .label(icons::symbol(
+                        icons::RADIO_BUTTON_CHECKED,
+                        15.0,
+                        theme::palette(ui.ctx()).ok,
+                    ))
+                    .hovered()
+            {
                 alvr_gui_common::tooltip(ui, "real_time_tooltip", "此设置可在串流期间实时更改！");
             }
         });

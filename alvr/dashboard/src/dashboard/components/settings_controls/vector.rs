@@ -1,12 +1,15 @@
 use super::{reset, NestingInfo, SettingControl, INDENTATION_STEP};
-use crate::dashboard::components::{
-    collapsible,
-    up_down::{self, UpDownResult},
+use crate::{
+    dashboard::components::{
+        collapsible,
+        up_down::{self, UpDownResult},
+    },
+    icons,
 };
 use alvr_packets::PathValuePair;
 use alvr_session::settings_schema::SchemaNode;
 use eframe::{
-    egui::{Layout, Ui},
+    egui::{Button, Layout, Ui},
     emath::Align,
 };
 use serde_json as json;
@@ -90,7 +93,10 @@ impl Control {
                     .horizontal(|ui| {
                         ui.add_space(INDENTATION_STEP * self.nesting_info.indentation_level as f32);
 
-                        let delete_element = ui.button("❌").clicked();
+                        let delete_element = ui
+                            .add(Button::new(icons::symbol_auto(icons::DELETE, 17.0)))
+                            .on_hover_text("删除此项")
+                            .clicked();
 
                         let up_down_result = up_down::up_down_buttons(ui, idx, self.controls.len());
 

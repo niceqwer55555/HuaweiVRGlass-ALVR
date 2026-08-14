@@ -15,10 +15,18 @@ pub fn about_tab_ui(ui: &mut Ui) {
         "在 Open Collective 向 ALVR 捐赠",
         "https://opencollective.com/alvr",
     );
+    ui.hyperlink_to(
+        "界面规范：Material Design 2",
+        "https://m2.material.io/design",
+    );
+    ui.hyperlink_to(
+        "图标：Google Material Symbols Sharp",
+        "https://github.com/google/material-design-icons",
+    );
     ui.add_space(10.0);
     ui.label("许可证：");
     Frame::group(ui.style())
-        .fill(theme::DARKER_BG)
+        .fill(theme::palette(ui.ctx()).inset_surface)
         .inner_margin(egui::vec2(15.0, 12.0))
         .show(ui, |ui| {
             ScrollArea::new([false, true])

@@ -16,6 +16,16 @@ pub fn install_chinese_font(context: &Context) {
             "../resources/NotoSansCJKsc-Regular.otf"
         ))),
     );
+    fonts.font_data.insert(
+        crate::icons::FAMILY_NAME.into(),
+        Arc::new(FontData::from_static(include_bytes!(
+            "../resources/MaterialSymbolsSharp-subset.ttf"
+        ))),
+    );
+    fonts.families.insert(
+        crate::icons::family(),
+        vec![crate::icons::FAMILY_NAME.into()],
+    );
 
     for family in [FontFamily::Proportional, FontFamily::Monospace] {
         fonts
@@ -197,6 +207,7 @@ mod tests {
         assert_eq!(SETTINGS_NAMES.len(), 235);
         assert_eq!(SETTINGS_HELP.len(), 93);
         assert!(include_bytes!("../resources/NotoSansCJKsc-Regular.otf").len() > 1_000_000);
+        assert!(include_bytes!("../resources/MaterialSymbolsSharp-subset.ttf").len() > 50_000);
     }
 
     #[test]

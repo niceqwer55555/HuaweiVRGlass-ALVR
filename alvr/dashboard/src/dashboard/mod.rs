@@ -5,15 +5,39 @@ use self::components::{
 };
 use crate::{
     dashboard::components::{CloseAction, NewVersionPopup, StatisticsTab},
-    DataSources,
+    icons, DataSources,
 };
 use alvr_common::parking_lot::{Condvar, Mutex};
 use alvr_events::EventType;
 use alvr_gui_common::theme;
 use alvr_packets::{PathValuePair, ServerRequest};
 use alvr_session::SessionConfig;
-use eframe::egui::{self, Align, CentralPanel, Frame, Layout, Margin, RichText, SidePanel, Stroke};
-use std::{collections::BTreeMap, sync::Arc};
+use eframe::egui::{
+    self, Align, Button, CentralPanel, Frame, Layout, Margin, RichText, SidePanel, Stroke,
+};
+use std::sync::Arc;
+
+const THEME_STORAGE_KEY: &str = "huawei_dashboard_theme";
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DashboardTheme {
+    Dark,
+    Light,
+}
+
+impl DashboardTheme {
+    fn is_dark(self) -> bool {
+        self == Self::Dark
+    }
+
+    fn toggle(&mut self) {
+        *self = if self.is_dark() {
+            Self::Light
+        } else {
+            Self::Dark
+        };
+    }
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 enum Tab {
@@ -27,13 +51,65 @@ enum Tab {
     About,
 }
 
+const TABS: &[Tab] = &[
+    Tab::Devices,
+    Tab::Statistics,
+    Tab::Settings,
+    #[cfg(not(target_arch = "wasm32"))]
+    Tab::Installation,
+    Tab::Logs,
+    Tab::Debug,
+    Tab::About,
+];
+
+impl Tab {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Devices => "设备",
+            Self::Statistics => "统计",
+            Self::Settings => "设置",
+            #[cfg(not(target_arch = "wasm32"))]
+            Self::Installation => "安装",
+            Self::Logs => "日志",
+            Self::Debug => "调试",
+            Self::About => "关于",
+        }
+    }
+
+    fn subtitle(self) -> &'static str {
+        match self {
+            Self::Devices => "管理有线与无线客户端连接",
+            Self::Statistics => "查看串流性能与网络状态",
+            Self::Settings => "调整画质、延迟、音频与追踪",
+            #[cfg(not(target_arch = "wasm32"))]
+            Self::Installation => "维护 SteamVR 驱动与防火墙规则",
+            Self::Logs => "查看运行日志与诊断信息",
+            Self::Debug => "检查追踪、按键与触觉事件",
+            Self::About => "版本信息、开源项目与许可证",
+        }
+    }
+
+    fn icon(self) -> &'static str {
+        match self {
+            Self::Devices => icons::DEVICES,
+            Self::Statistics => icons::MONITORING,
+            Self::Settings => icons::SETTINGS,
+            #[cfg(not(target_arch = "wasm32"))]
+            Self::Installation => icons::INSTALL_DESKTOP,
+            Self::Logs => icons::DESCRIPTION,
+            Self::Debug => icons::BUG_REPORT,
+            Self::About => icons::INFO,
+        }
+    }
+}
+
 pub struct Dashboard {
     data_sources: DataSources,
     just_opened: bool,
     server_restarting: Arc<Mutex<bool>>,
     server_restarting_condvar: Arc<Condvar>,
+    theme: DashboardTheme,
     selected_tab: Tab,
-    tab_labels: BTreeMap<Tab, &'static str>,
     connections_tab: DevicesTab,
     statistics_tab: StatisticsTab,
     settings_tab: SettingsTab,
@@ -49,7 +125,21 @@ pub struct Dashboard {
 
 impl Dashboard {
     pub fn new(creation_context: &eframe::CreationContext<'_>, data_sources: DataSources) -> Self {
-        alvr_gui_common::theme::set_theme(&creation_context.egui_ctx);
+        let dashboard_theme = creation_context
+            .storage
+            .and_then(|storage| storage.get_string(THEME_STORAGE_KEY))
+            .map(|value| {
+                if value == "light" {
+                    DashboardTheme::Light
+                } else {
+                    DashboardTheme::Dark
+                }
+            })
+            .unwrap_or(DashboardTheme::Dark);
+        alvr_gui_common::theme::set_theme_mode(
+            &creation_context.egui_ctx,
+            dashboard_theme.is_dark(),
+        );
         crate::localization::install_chinese_font(&creation_context.egui_ctx);
 
         data_sources.request(ServerRequest::GetSession);
@@ -59,19 +149,8 @@ impl Dashboard {
             just_opened: true,
             server_restarting: Arc::new(Mutex::new(false)),
             server_restarting_condvar: Arc::new(Condvar::new()),
+            theme: dashboard_theme,
             selected_tab: Tab::Devices,
-            tab_labels: [
-                (Tab::Devices, "🔌  设备"),
-                (Tab::Statistics, "📈  统计"),
-                (Tab::Settings, "⚙  设置"),
-                #[cfg(not(target_arch = "wasm32"))]
-                (Tab::Installation, "💾  安装"),
-                (Tab::Logs, "📝  日志"),
-                (Tab::Debug, "🐞  调试"),
-                (Tab::About, "ℹ  关于"),
-            ]
-            .into_iter()
-            .collect(),
             connections_tab: DevicesTab::new(),
             statistics_tab: StatisticsTab::new(),
             settings_tab: SettingsTab::new(),
@@ -118,6 +197,7 @@ impl eframe::App for Dashboard {
         let mut requests = vec![];
 
         let connected_to_server = self.data_sources.server_connected();
+        let palette = theme::palette(context);
 
         while let Some(event) = self.data_sources.poll_event() {
             self.logs_tab.push_event(event.inner.clone());
@@ -167,13 +247,21 @@ impl eframe::App for Dashboard {
         }
 
         if *self.server_restarting.lock() {
-            CentralPanel::default().show(context, |ui| {
-                // todo: find a way to center both vertically and horizontally
-                ui.vertical_centered(|ui| {
-                    ui.add_space(100.0);
-                    ui.heading(RichText::new("SteamVR 正在重启").size(30.0));
+            CentralPanel::default()
+                .frame(Frame::new().fill(palette.background))
+                .show(context, |ui| {
+                    // todo: find a way to center both vertically and horizontally
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(100.0);
+                        ui.label(icons::symbol(icons::RESTART_ALT, 42.0, palette.accent));
+                        ui.add_space(8.0);
+                        ui.heading(RichText::new("SteamVR 正在重启").size(28.0));
+                        ui.label(
+                            RichText::new("请稍候，控制台会自动恢复连接")
+                                .color(palette.muted_foreground),
+                        );
+                    });
                 });
-            });
 
             return;
         }
@@ -207,21 +295,59 @@ impl eframe::App for Dashboard {
                 .resizable(false)
                 .frame(
                     Frame::new()
-                        .fill(theme::LIGHTER_BG)
-                        .inner_margin(Margin::same(7))
-                        .stroke(Stroke::new(1.0, theme::SEPARATOR_BG)),
+                        .fill(palette.navigation)
+                        .inner_margin(Margin::same(8))
+                        .stroke(Stroke::new(1.0, palette.separator)),
                 )
-                .exact_width(160.0)
+                .exact_width(224.0)
                 .show(context, |ui| {
-                    ui.with_layout(Layout::top_down_justified(Align::Center), |ui| {
-                        ui.add_space(13.0);
-                        ui.heading(RichText::new("ALVR 华为专版").size(22.0).strong());
+                    ui.add_space(10.0);
+                    ui.horizontal(|ui| {
+                        ui.add_space(8.0);
+                        ui.label(icons::symbol(icons::VIEW_IN_AR, 31.0, palette.accent));
+                        ui.vertical(|ui| {
+                            ui.label(RichText::new("ALVR 华为专版").size(18.0).strong());
+                            ui.label(
+                                RichText::new("VR Glass 串流控制台")
+                                    .size(11.5)
+                                    .color(palette.muted_foreground),
+                            );
+                        });
                         egui::warn_if_debug_build(ui);
                     });
+                    ui.add_space(14.0);
+                    ui.separator();
+                    ui.add_space(8.0);
 
                     ui.with_layout(Layout::top_down_justified(Align::Min), |ui| {
-                        for (tab, label) in &self.tab_labels {
-                            ui.selectable_value(&mut self.selected_tab, *tab, *label);
+                        for tab in TABS {
+                            let selected = self.selected_tab == *tab;
+                            let label = if selected {
+                                icons::label_colored(
+                                    ui.style(),
+                                    tab.icon(),
+                                    tab.label(),
+                                    15.0,
+                                    palette.on_accent,
+                                )
+                            } else {
+                                icons::label_colored(
+                                    ui.style(),
+                                    tab.icon(),
+                                    tab.label(),
+                                    15.0,
+                                    palette.foreground,
+                                )
+                            };
+                            let response = ui.add(
+                                Button::new(label)
+                                    .selected(selected)
+                                    .corner_radius(4.0)
+                                    .min_size(egui::vec2(ui.available_width(), 48.0)),
+                            );
+                            if response.clicked() {
+                                self.selected_tab = *tab;
+                            }
                         }
                     });
 
@@ -231,37 +357,104 @@ impl eframe::App for Dashboard {
                         |ui| {
                             ui.add_space(5.0);
 
+                            let (theme_icon, theme_label) = if self.theme.is_dark() {
+                                (icons::LIGHT_MODE, "切换到浅色模式")
+                            } else {
+                                (icons::DARK_MODE, "切换到深色模式")
+                            };
+                            if ui
+                                .add(
+                                    Button::new(icons::label(
+                                        ui.style(),
+                                        theme_icon,
+                                        theme_label,
+                                        12.0,
+                                    ))
+                                    .min_size(egui::vec2(ui.available_width(), 36.0)),
+                                )
+                                .clicked()
+                            {
+                                self.theme.toggle();
+                                theme::set_theme_mode(context, self.theme.is_dark());
+                                context.request_repaint();
+                            }
+
+                            ui.separator();
+
                             if connected_to_server {
-                                if ui.button("重启 SteamVR").clicked() {
+                                if ui
+                                    .add(
+                                        Button::new(icons::label(
+                                            ui.style(),
+                                            icons::RESTART_ALT,
+                                            "重启 SteamVR",
+                                            13.0,
+                                        ))
+                                        .min_size(egui::vec2(ui.available_width(), 38.0)),
+                                    )
+                                    .clicked()
+                                {
                                     self.restart_steamvr(&mut requests);
                                 }
-                            } else if ui.button("启动 SteamVR").clicked() {
+                            } else if ui
+                                .add(
+                                    Button::new(icons::label(
+                                        ui.style(),
+                                        icons::PLAY_ARROW,
+                                        "启动 SteamVR",
+                                        13.0,
+                                    ))
+                                    .min_size(egui::vec2(ui.available_width(), 38.0)),
+                                )
+                                .clicked()
+                            {
                                 crate::steamvr_launcher::LAUNCHER.lock().launch_steamvr();
                             }
 
                             ui.horizontal(|ui| {
-                                ui.add_space(5.0);
-                                ui.label(RichText::new("SteamVR：").size(13.0));
-                                ui.add_space(-10.0);
-                                if connected_to_server {
-                                    ui.label(
-                                        RichText::new("已连接").color(theme::OK_GREEN).size(13.0),
-                                    );
+                                ui.add_space(8.0);
+                                let (status, color) = if connected_to_server {
+                                    ("SteamVR 已连接", palette.ok)
                                 } else {
-                                    ui.label(
-                                        RichText::new("未连接").color(theme::KO_RED).size(13.0),
-                                    );
-                                }
+                                    ("SteamVR 未连接", palette.error)
+                                };
+                                ui.label(icons::symbol(icons::RADIO_BUTTON_CHECKED, 12.0, color));
+                                ui.add_space(-6.0);
+                                ui.label(RichText::new(status).color(color).size(12.5));
                             })
                         },
                     )
                 });
 
             CentralPanel::default()
-                .frame(Frame::new().inner_margin(Margin::same(20)).fill(theme::BG))
+                .frame(
+                    Frame::new()
+                        .inner_margin(Margin::same(24))
+                        .fill(palette.background),
+                )
                 .show(context, |ui| {
                     ui.with_layout(Layout::top_down_justified(Align::LEFT), |ui| {
-                        ui.heading(RichText::new(self.tab_labels[&self.selected_tab]).size(25.0));
+                        ui.horizontal(|ui| {
+                            ui.label(icons::symbol(
+                                self.selected_tab.icon(),
+                                31.0,
+                                palette.accent,
+                            ));
+                            ui.add_space(2.0);
+                            ui.vertical(|ui| {
+                                ui.heading(
+                                    RichText::new(self.selected_tab.label()).size(24.0).strong(),
+                                );
+                                ui.label(
+                                    RichText::new(self.selected_tab.subtitle())
+                                        .size(12.5)
+                                        .color(palette.muted_foreground),
+                                );
+                            });
+                        });
+                        ui.add_space(4.0);
+                        ui.separator();
+                        ui.add_space(6.0);
                         match self.selected_tab {
                             Tab::Devices => {
                                 requests.extend(self.connections_tab.ui(ui, connected_to_server));
@@ -333,5 +526,16 @@ impl eframe::App for Dashboard {
         {
             shutdown_alvr();
         }
+    }
+
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        storage.set_string(
+            THEME_STORAGE_KEY,
+            if self.theme.is_dark() {
+                "dark".into()
+            } else {
+                "light".into()
+            },
+        );
     }
 }

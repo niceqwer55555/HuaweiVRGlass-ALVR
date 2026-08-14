@@ -124,7 +124,7 @@ impl SettingsTab {
         let mut path_value_pairs = vec![];
         ui.with_layout(Layout::left_to_right(Align::Min), |ui| {
             Frame::group(ui.style())
-                .fill(theme::DARKER_BG)
+                .fill(theme::palette(ui.ctx()).inset_surface)
                 .inner_margin(egui::vec2(15.0, 12.0))
                 .show(ui, |ui| {
                     ui.horizontal_wrapped(|ui| {

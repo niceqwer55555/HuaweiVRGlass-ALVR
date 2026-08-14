@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod dashboard;
+mod icons;
 
 #[cfg(not(target_arch = "wasm32"))]
 mod data_sources;
@@ -77,7 +78,8 @@ fn main() {
         NativeOptions {
             viewport: ViewportBuilder::default()
                 .with_app_id("alvr.dashboard")
-                .with_inner_size((900.0, 600.0))
+                .with_inner_size((980.0, 660.0))
+                .with_min_inner_size((860.0, 560.0))
                 .with_icon(IconData {
                     rgba: image.rgba_data().to_owned(),
                     width: image.width(),

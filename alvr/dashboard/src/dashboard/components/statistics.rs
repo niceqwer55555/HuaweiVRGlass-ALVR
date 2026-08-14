@@ -183,9 +183,14 @@ impl StatisticsTab {
                         ui,
                         "运动到画面延迟",
                         stats.total_pipeline_latency_s,
-                        theme::FG,
+                        theme::palette(ui.ctx()).foreground,
                     );
-                    label(ui, "ALVR 传输延迟", transmission_total_latency_s, theme::FG);
+                    label(
+                        ui,
+                        "ALVR 传输延迟",
+                        transmission_total_latency_s,
+                        theme::palette(ui.ctx()).foreground,
+                    );
                     label(
                         ui,
                         "客户端系统（不计入 ALVR 延迟）",
@@ -258,6 +263,7 @@ impl StatisticsTab {
     }
 
     fn draw_bitrate_graph(&self, ui: &mut Ui, available_width: f32) {
+        let foreground = theme::palette(ui.ctx()).foreground;
         let mut data = statistics::Data::new(
             self.history
                 .iter()
@@ -346,7 +352,7 @@ impl StatisticsTab {
                     recorded_throughput,
                     graph_colors::RECORDED_THROUGHPUT,
                 );
-                draw_lines(painter, recorded_bitrate, theme::FG);
+                draw_lines(painter, recorded_bitrate, foreground);
             },
             |ui, stats| {
                 Grid::new("bitrate_tooltip").num_columns(2).show(ui, |ui| {

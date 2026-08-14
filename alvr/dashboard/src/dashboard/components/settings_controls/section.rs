@@ -1,8 +1,9 @@
 use super::{collapsible, notice, NestingInfo, SettingControl, INDENTATION_STEP};
+use crate::icons;
 use alvr_gui_common::{
     theme::{
+        self,
         log_colors::{INFO_LIGHT, WARNING_LIGHT},
-        OK_GREEN,
     },
     DisplayString,
 };
@@ -121,7 +122,10 @@ impl Control {
                     }
 
                     if let Some(string) = &entry.help {
-                        if ui.colored_label(INFO_LIGHT, "❓").hovered() {
+                        if ui
+                            .label(icons::symbol(icons::HELP, 17.0, INFO_LIGHT))
+                            .hovered()
+                        {
                             alvr_gui_common::tooltip(
                                 ui,
                                 &format!("{}_help_tooltip", entry.id.display),
@@ -129,7 +133,10 @@ impl Control {
                             );
                         }
                     }
-                    if entry.steamvr_restart_flag && ui.colored_label(WARNING_LIGHT, "⚠").hovered()
+                    if entry.steamvr_restart_flag
+                        && ui
+                            .label(icons::symbol(icons::WARNING, 17.0, WARNING_LIGHT))
+                            .hovered()
                     {
                         alvr_gui_common::tooltip(
                             ui,
@@ -138,8 +145,15 @@ impl Control {
                         );
                     }
 
-                    // The emoji is blue but it will be green in the UI
-                    if entry.real_time_flag && ui.colored_label(OK_GREEN, "🔵").hovered() {
+                    if entry.real_time_flag
+                        && ui
+                            .label(icons::symbol(
+                                icons::RADIO_BUTTON_CHECKED,
+                                15.0,
+                                theme::palette(ui.ctx()).ok,
+                            ))
+                            .hovered()
+                    {
                         alvr_gui_common::tooltip(
                             ui,
                             "real_time_tooltip",

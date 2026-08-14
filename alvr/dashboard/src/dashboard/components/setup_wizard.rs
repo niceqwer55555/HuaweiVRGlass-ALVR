@@ -1,3 +1,4 @@
+use crate::icons;
 use alvr_packets::{FirewallRulesAction, ServerRequest};
 use eframe::{
     egui::{Button, Label, Layout, RichText, Ui},
@@ -77,7 +78,11 @@ impl SetupWizard {
             });
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 ui.add_space(15.0);
-                if ui.button("❌").clicked() {
+                if ui
+                    .add(Button::new(icons::symbol_auto(icons::CLOSE, 19.0)))
+                    .on_hover_text("关闭设置向导")
+                    .clicked()
+                {
                     request = Some(SetupWizardRequest::Close { finished: false });
                 }
             })

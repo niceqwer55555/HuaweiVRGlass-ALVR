@@ -105,6 +105,7 @@ impl NotificationBar {
     }
 
     pub fn ui(&mut self, context: &egui::Context) {
+        let palette = theme::palette(context);
         let now = Instant::now();
         if now > self.receive_instant + TIMEOUT {
             self.message = self
@@ -118,14 +119,14 @@ impl NotificationBar {
             LogSeverity::Error => (Color32::BLACK, log_colors::ERROR_LIGHT),
             LogSeverity::Warning => (Color32::BLACK, log_colors::WARNING_LIGHT),
             LogSeverity::Info => (Color32::BLACK, log_colors::INFO_LIGHT),
-            LogSeverity::Debug => (theme::FG, theme::LIGHTER_BG),
+            LogSeverity::Debug => (palette.foreground, palette.navigation),
         };
 
         let mut bottom_bar = TopBottomPanel::bottom("bottom_panel").frame(
             Frame::default()
                 .inner_margin(egui::vec2(10.0, 5.0))
                 .fill(bg)
-                .stroke(Stroke::new(1.0, theme::SEPARATOR_BG)),
+                .stroke(Stroke::new(1.0, palette.separator)),
         );
         let alignment = if !self.expanded {
             bottom_bar = bottom_bar.max_height(26.0);

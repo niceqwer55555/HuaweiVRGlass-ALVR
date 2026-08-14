@@ -63,7 +63,7 @@ impl InstallationTab {
             });
 
             Frame::group(ui.style())
-                .fill(theme::SECTION_BG)
+                .fill(theme::palette(ui.ctx()).surface)
                 .show(ui, |ui| {
                     ui.vertical_centered(|ui| {
                         ui.add_space(5.0);

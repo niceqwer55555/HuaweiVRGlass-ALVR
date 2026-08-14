@@ -54,6 +54,7 @@ try {
     New-Item -ItemType Directory -Path $licensesDirectory -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $repoRoot 'LICENSE') -Destination (Join-Path $licensesDirectory 'ALVR-MIT.txt') -Force
     Copy-Item -LiteralPath (Join-Path $repoRoot 'alvr\dashboard\resources\Noto-CJK-LICENSE.txt') -Destination (Join-Path $licensesDirectory 'Noto-CJK-OFL.txt') -Force
+    Copy-Item -LiteralPath (Join-Path $repoRoot 'alvr\dashboard\resources\MaterialSymbols-LICENSE.txt') -Destination (Join-Path $licensesDirectory 'Material-Symbols-Apache-2.0.txt') -Force
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'README.md') -Destination (Join-Path $streamerDirectory '华为专版说明.md') -Force
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'apply-verified-profile.ps1') -Destination (Join-Path $streamerDirectory '应用华为已验收配置.ps1') -Force
 

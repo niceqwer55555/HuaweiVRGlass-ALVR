@@ -192,7 +192,7 @@ fn wired_client_section(
     let mut request = None;
 
     Frame::group(ui.style())
-        .fill(theme::SECTION_BG)
+        .fill(theme::palette(ui.ctx()).surface)
         .inner_margin(egui::vec2(15.0, 12.0))
         .show(ui, |ui| {
             Grid::new("wired-client")
@@ -251,7 +251,7 @@ fn new_clients_section(
     let mut request = None;
 
     Frame::group(ui.style())
-        .fill(theme::SECTION_BG)
+        .fill(theme::palette(ui.ctx()).surface)
         .show(ui, |ui| {
             ui.vertical_centered_justified(|ui| {
                 ui.add_space(5.0);
@@ -270,7 +270,7 @@ fn new_clients_section(
             });
             for (hostname, _) in clients {
                 Frame::group(ui.style())
-                    .fill(theme::DARKER_BG)
+                    .fill(theme::palette(ui.ctx()).inset_surface)
                     .inner_margin(egui::vec2(15.0, 12.0))
                     .show(ui, |ui| {
                         Grid::new(format!("{hostname}-new-clients"))
@@ -305,7 +305,7 @@ fn trusted_clients_section(
     let mut request = None;
 
     Frame::group(ui.style())
-        .fill(theme::SECTION_BG)
+        .fill(theme::palette(ui.ctx()).surface)
         .show(ui, |ui| {
             Grid::new(0).num_columns(2).show(ui, |ui| {
                 ui.horizontal(|ui| {
@@ -326,7 +326,7 @@ fn trusted_clients_section(
 
             for (hostname, data) in clients {
                 Frame::group(ui.style())
-                    .fill(theme::DARKER_BG)
+                    .fill(theme::palette(ui.ctx()).inset_surface)
                     .inner_margin(egui::vec2(15.0, 12.0))
                     .show(ui, |ui| {
                         Grid::new(format!("{hostname}-clients"))
@@ -378,8 +378,8 @@ fn connection_label(ui: &mut Ui, connection_state: &ConnectionState) {
     match connection_state {
         ConnectionState::Disconnected => ui.colored_label(Color32::GRAY, "未连接"),
         ConnectionState::Connecting => ui.colored_label(log_colors::WARNING_LIGHT, "连接中"),
-        ConnectionState::Connected => ui.colored_label(theme::OK_GREEN, "已连接"),
-        ConnectionState::Streaming => ui.colored_label(theme::OK_GREEN, "串流中"),
+        ConnectionState::Connected => ui.colored_label(theme::palette(ui.ctx()).ok, "已连接"),
+        ConnectionState::Streaming => ui.colored_label(theme::palette(ui.ctx()).ok, "串流中"),
         ConnectionState::Disconnecting => ui.colored_label(log_colors::WARNING_LIGHT, "正在断开"),
     };
 }
