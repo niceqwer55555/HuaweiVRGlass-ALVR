@@ -324,10 +324,19 @@ fn decoder_lifecycle(
     } else {
         available_buffering_frames
     };
+    // releaseOutputBuffer(render=true) lets MediaCodec convert its microsecond PTS to the
+    // Surface's nanosecond timestamp. ALVR intentionally stores a nanosecond value in that PTS
+    // field, so the Surface timestamp becomes 1000x too large. Keep the original ALVR value in
+    // output order and pair it with the corresponding ImageReader callback instead.
+    let immediate_render_timestamps = Arc::new(Mutex::new(VecDeque::<Duration>::new()));
 
     image_reader.set_image_listener(Box::new({
         let image_queue = Arc::clone(&image_queue);
+        let immediate_render_timestamps = Arc::clone(&immediate_render_timestamps);
         let logged_first_image = Arc::new(RelaxedAtomic::new(false));
+        let logged_missing_timestamp = Arc::new(RelaxedAtomic::new(false));
+        let logged_timestamp_resync = Arc::new(RelaxedAtomic::new(false));
+        let render_output_immediately = config.render_output_immediately;
         move |image_reader| {
             let mut image_queue_lock = image_queue.lock();
 
@@ -343,12 +352,45 @@ fn decoder_lifecycle(
             };
             match acquire_result {
                 Ok(AcquireResult::Image(image)) => {
-                    let timestamp = Duration::from_nanos(image.timestamp().unwrap() as u64);
+                    let surface_timestamp =
+                        Duration::from_nanos(image.timestamp().unwrap() as u64);
+                    let timestamp = if render_output_immediately {
+                        let recovered_timestamp =
+                            Duration::from_nanos(surface_timestamp.as_nanos() as u64 / 1000);
+                        let mut timestamps = immediate_render_timestamps.lock();
+
+                        if let Some(index) = timestamps
+                            .iter()
+                            .position(|timestamp| *timestamp == recovered_timestamp)
+                        {
+                            if index > 0 && !logged_timestamp_resync.value() {
+                                warn!(
+                                    "Immediate decoder timestamp resynchronized after {index} skipped Surface frame(s)"
+                                );
+                                logged_timestamp_resync.set(true);
+                            }
+                            timestamps.drain(..=index);
+                            recovered_timestamp
+                        } else {
+                            timestamps.pop_front().unwrap_or_else(|| {
+                                if !logged_missing_timestamp.value() {
+                                    warn!(
+                                        "Immediate decoder frame has no queued ALVR timestamp; falling back to Surface timestamp"
+                                    );
+                                    logged_missing_timestamp.set(true);
+                                }
+                                surface_timestamp
+                            })
+                        }
+                    } else {
+                        surface_timestamp
+                    };
 
                     if !logged_first_image.value() {
                         info!(
-                            "[HVR-DIAG] ImageReader acquired first frame: timestamp_ns={}, hardware_buffer={}",
+                            "[HVR-DIAG] ImageReader acquired first frame: timestamp_ns={}, surface_timestamp_ns={}, hardware_buffer={}",
                             timestamp.as_nanos(),
+                            surface_timestamp.as_nanos(),
                             image.hardware_buffer().is_ok()
                         );
                         logged_first_image.set(true);
@@ -493,6 +535,12 @@ fn decoder_lifecycle(
                     logged_first_output_buffer = true;
                 }
 
+                if config.render_output_immediately {
+                    immediate_render_timestamps
+                        .lock()
+                        .push_back(Duration::from_nanos(presentation_time_ns as u64));
+                }
+
                 let release_result = if config.render_output_immediately {
                     decoder.release_output_buffer(buffer, true)
                 } else {
@@ -500,6 +548,9 @@ fn decoder_lifecycle(
                 };
 
                 if let Err(e) = release_result {
+                    if config.render_output_immediately {
+                        immediate_render_timestamps.lock().pop_back();
+                    }
                     error!("Decoder dequeue error: {e}");
                 }
             }

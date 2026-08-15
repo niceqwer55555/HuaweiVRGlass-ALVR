@@ -694,7 +694,18 @@ fn poll_stream_inputs(
     };
 
     if let Some(views) = local_views {
-        core_ctx.send_view_params(views);
+        if platform.is_huawei() {
+            alvr_common::warn!(
+                "[HVR-DIAG] Preserving Huawei runtime FoV for SteamVR: left_fov={:?}, right_fov={:?}, left_orientation={:?}, right_orientation={:?}",
+                views[0].fov,
+                views[1].fov,
+                views[0].pose.orientation,
+                views[1].pose.orientation,
+            );
+            core_ctx.send_view_params_preserving_fov(views);
+        } else {
+            core_ctx.send_view_params(views);
+        }
         state.last_view_params = views;
         state.view_config_sent = true;
     }

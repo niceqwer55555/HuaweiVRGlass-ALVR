@@ -1,13 +1,16 @@
 package com.lht.huaweivr.alvr;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.hardware.display.DisplayManager;
 import android.net.wifi.WifiManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
@@ -23,6 +26,7 @@ import java.util.Locale;
 
 /** Phone-side launcher. VR rendering remains in {@link HuaweiVrActivity}. */
 public final class HuaweiVrLauncherActivity extends Activity {
+    private static final int STORAGE_PERMISSION_REQUEST = 8477;
     private static final int COLOR_BACKGROUND = Color.rgb(7, 20, 30);
     private static final int COLOR_CARD = Color.rgb(17, 42, 56);
     private static final int COLOR_PRIMARY = Color.rgb(44, 178, 199);
@@ -36,6 +40,35 @@ public final class HuaweiVrLauncherActivity extends Activity {
         getWindow().setStatusBarColor(COLOR_BACKGROUND);
         getWindow().setNavigationBarColor(COLOR_BACKGROUND);
         setContentView(createContent());
+        requestStoragePermissionIfNeeded();
+    }
+
+    private void requestStoragePermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M
+                || (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
+                                == PackageManager.PERMISSION_GRANTED
+                        && checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                                == PackageManager.PERMISSION_GRANTED)) {
+            return;
+        }
+
+        requestPermissions(
+                new String[] {
+                    Manifest.permission.READ_EXTERNAL_STORAGE,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE
+                },
+                STORAGE_PERMISSION_REQUEST);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(
+            int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == STORAGE_PERMISSION_REQUEST
+                && checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                        != PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, "未授予存储权限，VR 截图将无法保存。", Toast.LENGTH_LONG).show();
+        }
     }
 
     private View createContent() {

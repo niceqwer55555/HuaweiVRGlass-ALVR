@@ -40,11 +40,19 @@ foreach ($requiredFile in @($NativeLibrary, $LoaderLibrary, $BridgeJar, $PromptA
 $buildTools = Join-Path $AndroidSdk 'build-tools\34.0.0'
 $androidJar = Join-Path $AndroidSdk 'platforms\android-34\android.jar'
 $manifest = Join-Path $clientRoot 'android_huawei\AndroidManifest.xml'
+$huaweiAssets = Join-Path $clientRoot 'android_huawei\assets'
 $javaSources = @(
     (Join-Path $clientRoot 'android_huawei\src\com\lht\huaweivr\alvr\HuaweiVrActivity.java'),
     (Join-Path $clientRoot 'android_huawei\src\com\lht\huaweivr\alvr\HuaweiVrLauncherActivity.java')
 )
 $resources = Join-Path $clientRoot 'resources'
+
+foreach ($requiredAsset in @('vr_icon_background.png', 'vr_icon_foreground.png')) {
+    $assetPath = Join-Path $huaweiAssets $requiredAsset
+    if (-not (Test-Path -LiteralPath $assetPath -PathType Leaf)) {
+        throw "缺少 Huawei VR Launcher 双层图标资产：$assetPath"
+    }
+}
 
 if (Test-Path -LiteralPath $workRoot) {
     Remove-Item -LiteralPath $workRoot -Recurse -Force
@@ -71,6 +79,7 @@ New-Item -ItemType Directory -Path $generatedSources -Force | Out-Null
     -M $manifest `
     -S $resources `
     -S (Join-Path $promptRoot 'res') `
+    -A $huaweiAssets `
     -I $androidJar `
     --auto-add-overlay `
     --extra-packages com.huawei.vrlab `
@@ -112,3 +121,10 @@ Copy-Item -LiteralPath $alignedApk -Destination $OutputApk -Force
 
 & (Join-Path $buildTools 'zipalign.exe') -c -v 4 $OutputApk
 & (Join-Path $buildTools 'apksigner.bat') verify --verbose $OutputApk
+
+$packagedAssets = & (Join-Path $buildTools 'aapt.exe') list $OutputApk
+foreach ($requiredAsset in @('assets/vr_icon_background.png', 'assets/vr_icon_foreground.png')) {
+    if ($requiredAsset -notin $packagedAssets) {
+        throw "Huawei VR Launcher 图标资产未写入 APK：$requiredAsset"
+    }
+}

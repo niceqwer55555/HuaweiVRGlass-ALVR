@@ -224,6 +224,21 @@ impl ClientCoreContext {
             canted_view_to_proportional_circumscribed_orthogonal(views[1], comfort),
         ];
 
+        self.send_orthogonal_view_params(views_openvr);
+    }
+
+    // Huawei's legacy runtime already reports the calibrated square optical FoV. Expanding it
+    // through the generic canted-view path makes SteamVR render a wider 102.8° source image than
+    // the runtime's 95° view. Keep OpenVR-compatible orthogonal eye poses without changing FoV.
+    pub fn send_view_params_preserving_fov(&self, views: [ViewParams; 2]) {
+        dbg_client_core!("send_view_params_preserving_fov");
+
+        let views_openvr = views.map(orthogonal_view_preserving_fov);
+
+        self.send_orthogonal_view_params(views_openvr);
+    }
+
+    fn send_orthogonal_view_params(&self, views_openvr: [ViewParams; 2]) {
         *self.connection_context.view_params.write() = views_openvr;
 
         if let Some(sender) = &mut *self.connection_context.control_sender.lock() {
@@ -421,6 +436,16 @@ impl Drop for ClientCoreContext {
 
         #[cfg(target_os = "android")]
         alvr_system_info::set_wifi_lock(false);
+    }
+}
+
+fn orthogonal_view_preserving_fov(view: ViewParams) -> ViewParams {
+    ViewParams {
+        pose: Pose {
+            orientation: Quat::IDENTITY,
+            position: view.pose.position,
+        },
+        fov: view.fov,
     }
 }
 
