@@ -615,6 +615,20 @@ mod tests {
     }
 
     #[test]
+    fn test_huawei_default_video_profile() {
+        let settings = SessionConfig::default().to_settings();
+
+        for resolution in [
+            settings.video.transcoding_view_resolution,
+            settings.video.emulated_headset_view_resolution,
+        ] {
+            assert!(matches!(resolution, FrameSize::Scale(scale) if scale == 1.0));
+        }
+
+        assert_eq!(settings.video.preferred_fps, 72.0);
+    }
+
+    #[test]
     fn test_session_extrapolation_trivial() {
         SessionConfig::default()
             .merge_from_json(&json::to_value(SessionConfig::default()).unwrap())

@@ -3,6 +3,7 @@ mod extra_extensions;
 mod graphics;
 #[cfg(target_os = "android")]
 mod huawei_activity;
+mod huawei_input;
 #[cfg(target_os = "android")]
 mod huawei_runtime;
 mod interaction;

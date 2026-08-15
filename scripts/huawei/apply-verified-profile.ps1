@@ -14,24 +14,24 @@ function New-AlvrPath {
 
 $values = @(
     @{
-        path = New-AlvrPath @('session_settings', 'video', 'transcoding_view_resolution', 'Absolute', 'width')
-        value = 896
+        path = New-AlvrPath @('session_settings', 'video', 'transcoding_view_resolution', 'variant')
+        value = 'Scale'
     },
     @{
-        path = New-AlvrPath @('session_settings', 'video', 'transcoding_view_resolution', 'Absolute', 'height', 'content')
-        value = 896
+        path = New-AlvrPath @('session_settings', 'video', 'transcoding_view_resolution', 'Scale')
+        value = 1.0
     },
     @{
-        path = New-AlvrPath @('session_settings', 'video', 'emulated_headset_view_resolution', 'Absolute', 'width')
-        value = 1552
+        path = New-AlvrPath @('session_settings', 'video', 'emulated_headset_view_resolution', 'variant')
+        value = 'Scale'
     },
     @{
-        path = New-AlvrPath @('session_settings', 'video', 'emulated_headset_view_resolution', 'Absolute', 'height', 'content')
-        value = 1552
+        path = New-AlvrPath @('session_settings', 'video', 'emulated_headset_view_resolution', 'Scale')
+        value = 1.0
     },
     @{
         path = New-AlvrPath @('session_settings', 'video', 'preferred_fps')
-        value = 70.0
+        value = 72.0
     },
     @{
         path = New-AlvrPath @('session_settings', 'video', 'bitrate', 'mode', 'ConstantMbps')
@@ -77,8 +77,8 @@ catch {
     throw "无法连接 ALVR 服务端。请先启动 ALVR Dashboard.exe 和 SteamVR，再运行本脚本。原始错误：$($_.Exception.Message)"
 }
 
-Write-Host '已应用 Huawei VR Glass 真机验收配置：'
-Write-Host '  串流：896x896/眼，H.264，14 Mbps，70 Hz'
-Write-Host '  显示目标：1552x1552/眼，固定注视点编码关闭'
+Write-Host '已应用 Huawei VR Glass Runtime 比例配置：'
+Write-Host '  串流：Runtime 推荐分辨率 1.0x（当前实际对齐为 1536x1536/眼），H.264，14 Mbps'
+Write-Host '  显示目标：Runtime 推荐分辨率 1.0x，首选 72 Hz，固定注视点编码关闭'
 Write-Host '  延迟：客户端缓冲 1 帧，PC 待发送队列 1 帧，TCP'
 Write-Host '请在 Dashboard 中重启 SteamVR，使分辨率和刷新率生效。'

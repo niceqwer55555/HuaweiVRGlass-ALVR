@@ -9,7 +9,7 @@ use crate::{
         FULL_BODY_JOINT_LEFT_FOOT_BALL_META, FULL_BODY_JOINT_LEFT_LOWER_LEG_META,
         FULL_BODY_JOINT_RIGHT_FOOT_BALL_META, FULL_BODY_JOINT_RIGHT_LOWER_LEG_META,
     },
-    Platform,
+    huawei_input, Platform,
 };
 use alvr_common::{
     glam::{Quat, Vec3},
@@ -1187,28 +1187,92 @@ pub fn update_buttons(
                 action,
                 subaction_path,
             } => {
+                if platform.is_huawei()
+                    && (*id == *LEFT_THUMBSTICK_X_ID
+                        || *id == *LEFT_THUMBSTICK_Y_ID
+                        || *id == *RIGHT_THUMBSTICK_X_ID
+                        || *id == *RIGHT_THUMBSTICK_Y_ID)
+                {
+                    continue;
+                }
+
                 let Ok(state) = action.state(xr_session, *subaction_path) else {
                     continue;
                 };
 
                 if state.changed_since_last_sync {
-                    let value = if platform.is_huawei()
-                        && (*id == *LEFT_THUMBSTICK_Y_ID || *id == *RIGHT_THUMBSTICK_Y_ID)
-                    {
-                        -state.current_state
-                    } else {
-                        state.current_state
-                    };
                     button_entries.push(ButtonEntry {
                         path_id: *id,
-                        value: ButtonValue::Scalar(value),
+                        value: ButtonValue::Scalar(state.current_state),
                     });
                 }
             }
         }
     }
 
+    if platform.is_huawei() {
+        append_huawei_thumbstick_entries(
+            xr_session,
+            button_actions,
+            *LEFT_THUMBSTICK_X_ID,
+            *LEFT_THUMBSTICK_Y_ID,
+            &mut button_entries,
+        );
+        append_huawei_thumbstick_entries(
+            xr_session,
+            button_actions,
+            *RIGHT_THUMBSTICK_X_ID,
+            *RIGHT_THUMBSTICK_Y_ID,
+            &mut button_entries,
+        );
+    }
+
     button_entries
+}
+
+fn append_huawei_thumbstick_entries(
+    xr_session: &xr::Session<xr::OpenGlEs>,
+    button_actions: &HashMap<u64, ButtonAction>,
+    x_id: u64,
+    y_id: u64,
+    button_entries: &mut Vec<ButtonEntry>,
+) {
+    let Some(ButtonAction::Scalar {
+        action: x_action,
+        subaction_path: x_subaction_path,
+    }) = button_actions.get(&x_id)
+    else {
+        return;
+    };
+    let Some(ButtonAction::Scalar {
+        action: y_action,
+        subaction_path: y_subaction_path,
+    }) = button_actions.get(&y_id)
+    else {
+        return;
+    };
+    let Ok(x_state) = x_action.state(xr_session, *x_subaction_path) else {
+        return;
+    };
+    let Ok(y_state) = y_action.state(xr_session, *y_subaction_path) else {
+        return;
+    };
+
+    if !x_state.changed_since_last_sync && !y_state.changed_since_last_sync {
+        return;
+    }
+
+    let (x, y) = huawei_input::normalize_thumbstick(x_state.current_state, y_state.current_state);
+    button_entries.extend([
+        ButtonEntry {
+            path_id: x_id,
+            value: ButtonValue::Scalar(x),
+        },
+        ButtonEntry {
+            path_id: y_id,
+            value: ButtonValue::Scalar(y),
+        },
+    ]);
 }
 
 pub fn get_eye_gazes(

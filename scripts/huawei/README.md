@@ -40,4 +40,4 @@ pwsh -NoProfile -File .\scripts\huawei\build-windows.ps1 -Configuration Release 
 - Android armeabi-v7a Release APK：已通过构建、zipalign、APK v2/v3 签名和鸿蒙 4.2 真机安装验证。
 - Windows x64 Release：已完成中文专版构建和打包。
 - 中文界面：Dashboard 主界面、设置名称、选项、说明、提示和客户端状态页均已覆盖；SteamVR、驱动和游戏输出的原始诊断日志保持原文，便于排错和检索。
-- 真机串流：双眼画面、95° FOV、70 Hz、左右手柄独立 6DoF、Home 生命周期和解码 underflow 防蓝闪路径均已接通。当前佩戴验收档为 TCP、H.264、`896×896/眼`、14 Mbps、1 帧客户端缓冲、1 帧 PC 待发送队列和 FFE 关闭；用户确认画面清晰、延迟可以接受。
+- 真机串流：双眼画面、95° FOV、70 Hz、左右手柄独立 6DoF、Home 生命周期和解码 underflow 防蓝闪路径均已接通。新会话与一键配置默认把编解码和模拟头显分辨率设为 Runtime 推荐值 `1.0×`，当前上报 1552×1552/眼、编码对齐后实际为 1536×1536/眼；PC 首选帧率为 72 Hz，Huawei Runtime 只提供 70 Hz 时会自动选择 70 Hz。其余默认值为 TCP、H.264、14 Mbps、1 帧客户端缓冲、1 帧 PC 待发送队列和 FFE 关闭。性能不足时可把编解码分辨率改为已验收的绝对 `896×896/眼` 低延迟档。

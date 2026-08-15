@@ -10,6 +10,8 @@ use settings_schema::{
     VectorDefault,
 };
 
+const DEFAULT_VIEW_RESOLUTION: u32 = 1552;
+
 include!(concat!(env!("OUT_DIR"), "/openvr_property_keys.rs"));
 
 pub enum OpenvrPropType {
@@ -1581,13 +1583,13 @@ pub struct Settings {
 
 pub fn session_settings_default() -> SettingsDefault {
     let view_resolution = FrameSizeDefault {
-        variant: FrameSizeDefaultVariant::Absolute,
+        variant: FrameSizeDefaultVariant::Scale,
         Scale: 1.0,
         Absolute: FrameSizeAbsoluteDefault {
-            width: 2144,
+            width: DEFAULT_VIEW_RESOLUTION,
             height: OptionalDefault {
-                set: false,
-                content: 1072,
+                set: true,
+                content: DEFAULT_VIEW_RESOLUTION,
             },
         },
     };
