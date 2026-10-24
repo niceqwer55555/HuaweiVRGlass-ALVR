@@ -10,7 +10,11 @@ mod data_sources;
 mod data_sources_wasm;
 mod localization;
 #[cfg(not(target_arch = "wasm32"))]
+mod game_library;
+#[cfg(not(target_arch = "wasm32"))]
 mod logging_backend;
+#[cfg(not(target_arch = "wasm32"))]
+mod steam_library;
 #[cfg(not(target_arch = "wasm32"))]
 mod steamvr_launcher;
 
@@ -52,6 +56,10 @@ fn main() {
     logging_backend::init_logging(server_events_sender.clone());
 
     data_sources::clean_session();
+
+    // The SteamVR path is stored next to the executable so it is available even
+    // before the dashboard UI (and its settings storage) is initialised.
+    steamvr_launcher::load_persisted_steamvr_path();
 
     if data_sources::get_read_only_local_session()
         .settings()

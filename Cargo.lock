@@ -4071,7 +4071,6 @@ version = "0.18.0"
 dependencies = [
  "libc",
  "libloading",
- "log",
  "ndk-context",
  "openxr-sys",
 ]
@@ -4079,6 +4078,8 @@ dependencies = [
 [[package]]
 name = "openxr-sys"
 version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1534b2c14b56564e58b91f5015817e1d87bd43ca12a188eda6a9ea3859b0ec25"
 dependencies = [
  "libc",
 ]

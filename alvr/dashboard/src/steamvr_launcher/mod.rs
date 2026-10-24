@@ -19,6 +19,7 @@ use std::{
     ffi::OsStr,
     fs,
     marker::PhantomData,
+    path::PathBuf,
     thread,
     time::{Duration, Instant},
 };
@@ -27,6 +28,55 @@ use sysinfo::{ProcessesToUpdate, System};
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(10);
 const DRIVER_KEY: &str = "driver_alvr_server";
 const BLOCKED_KEY: &str = "blocked_by_safe_mode";
+
+// SteamVR path configured by the user in the dashboard. It is kept here so that
+// every launch entry point (startup, drawer button, devices tab) uses the same
+// value without threading it through the whole UI.
+pub static MANUAL_STEAMVR_PATH: Lazy<Mutex<String>> = Lazy::new(|| Mutex::new(String::new()));
+
+const STEAMVR_PATH_FILE: &str = "steamvr_path.txt";
+
+/// Sidecar file next to the dashboard executable. SteamVR may be launched
+/// before the dashboard UI loads its own storage, so the path is mirrored here.
+fn steamvr_path_file() -> Option<std::path::PathBuf> {
+    let mut dir = std::env::current_exe().ok()?;
+    dir.pop();
+    Some(dir.join(STEAMVR_PATH_FILE))
+}
+
+pub fn set_manual_steamvr_path(path: impl Into<String>) {
+    let path = path.into();
+
+    if let Some(file) = steamvr_path_file() {
+        let _ = fs::write(file, &path);
+    }
+
+    *MANUAL_STEAMVR_PATH.lock() = path;
+}
+
+pub fn load_persisted_steamvr_path() {
+    if let Some(file) = steamvr_path_file() {
+        if let Ok(text) = fs::read_to_string(file) {
+            *MANUAL_STEAMVR_PATH.lock() = text.trim().to_owned();
+        }
+    }
+}
+
+pub fn manual_steamvr_path() -> String {
+    MANUAL_STEAMVR_PATH.lock().clone()
+}
+
+/// Resolves an arbitrary user supplied path (without touching the stored
+/// setting). Used by the "Steam library" tab to show a live preview.
+#[cfg(windows)]
+pub fn resolve_steamvr_path(input: &str) -> Option<PathBuf> {
+    windows_steamvr::resolve_steamvr_launch_path(input)
+}
+
+#[cfg(not(windows))]
+pub fn resolve_steamvr_path(_input: &str) -> Option<PathBuf> {
+    None
+}
 
 pub fn is_steamvr_running() -> bool {
     System::new_all()
@@ -160,7 +210,7 @@ impl Launcher {
             debug!("SteamVR is dead. Launching...");
 
             #[cfg(windows)]
-            windows_steamvr::start_steamvr();
+            windows_steamvr::start_steamvr(&manual_steamvr_path());
 
             #[cfg(target_os = "linux")]
             linux_steamvr::start_steamvr();

@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [ValidateSet('Debug', 'Release')]
     [string]$Configuration = 'Release',
@@ -9,8 +9,15 @@ $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $projectRoot = (Resolve-Path (Join-Path $repoRoot '..')).Path
-$vsDevCmd = 'C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat'
+$vsDevCmdCandidates = @(
+    'C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat',
+    'F:\VS2022\BuildTools\Common7\Tools\VsDevCmd.bat'
+)
+$vsDevCmd = $vsDevCmdCandidates |
+    Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+    Select-Object -First 1
 $libclangCandidates = @(
+    'F:\LLVM\bin',
     'C:\Program Files\LLVM\bin',
     'C:\Program Files\Autodesk\3ds Max 2024',
     'C:\Program Files\Autodesk\Maya2023\bin'
@@ -34,6 +41,29 @@ foreach ($line in $vsEnvironment) {
 }
 $env:LIBCLANG_PATH = $libclangPath
 
+# 若 VsDevCmd 未包含 Windows SDK 路径（SDK 独立安装时），手动补齐
+$winSdkRootCandidates = @(
+    'C:\Program Files (x86)\Windows Kits\10',
+    'F:\Windows Kits\10'
+)
+$winSdkRoot = $winSdkRootCandidates |
+    Where-Object { Test-Path -LiteralPath (Join-Path $_ 'Include') -PathType Container } |
+    Select-Object -First 1
+if ($winSdkRoot) {
+    $winSdkVersion = Get-ChildItem -LiteralPath (Join-Path $winSdkRoot 'Include') -Directory |
+        Where-Object { $_.Name -match '^\d' } |
+        Sort-Object Name -Descending |
+        Select-Object -First 1 -ExpandProperty Name
+    $sdkInclude = @('ucrt', 'um', 'shared', 'winrt', 'cppwinrt') | ForEach-Object {
+        Join-Path (Join-Path (Join-Path $winSdkRoot 'Include') $winSdkVersion) $_
+    }
+    $sdkLib = @('ucrt\x64', 'um\x64') | ForEach-Object {
+        Join-Path (Join-Path (Join-Path $winSdkRoot 'Lib') $winSdkVersion) $_
+    }
+    $env:INCLUDE = (@($env:INCLUDE) + $sdkInclude) -join ';'
+    $env:LIB = (@($env:LIB) + $sdkLib) -join ';'
+}
+
 Push-Location $repoRoot
 try {
     $buildArguments = @('xtask', 'build-streamer')
@@ -44,6 +74,9 @@ try {
         $buildArguments += '--keep-config'
     }
     cargo @buildArguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "cargo xtask build-streamer 失败，退出码：$LASTEXITCODE"
+    }
 
     $streamerDirectory = Join-Path $repoRoot 'build\alvr_streamer_windows'
     if (-not (Test-Path -LiteralPath $streamerDirectory -PathType Container)) {

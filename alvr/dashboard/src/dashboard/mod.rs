@@ -18,6 +18,10 @@ use std::sync::Arc;
 
 const THEME_STORAGE_KEY: &str = "huawei_dashboard_theme";
 const DRAWER_STORAGE_KEY: &str = "huawei_dashboard_drawer";
+#[cfg(not(target_arch = "wasm32"))]
+const STEAMVR_PATH_STORAGE_KEY: &str = "huawei_dashboard_steamvr_path";
+#[cfg(not(target_arch = "wasm32"))]
+const STEAM_ROOT_STORAGE_KEY: &str = "huawei_dashboard_steam_root";
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum DashboardTheme {
@@ -61,6 +65,8 @@ enum Tab {
     Statistics,
     Settings,
     #[cfg(not(target_arch = "wasm32"))]
+    GameLibrary,
+    #[cfg(not(target_arch = "wasm32"))]
     Installation,
     Logs,
     Debug,
@@ -71,6 +77,8 @@ const TABS: &[Tab] = &[
     Tab::Devices,
     Tab::Statistics,
     Tab::Settings,
+    #[cfg(not(target_arch = "wasm32"))]
+    Tab::GameLibrary,
     #[cfg(not(target_arch = "wasm32"))]
     Tab::Installation,
     Tab::Logs,
@@ -85,6 +93,8 @@ impl Tab {
             Self::Statistics => "统计",
             Self::Settings => "设置",
             #[cfg(not(target_arch = "wasm32"))]
+            Self::GameLibrary => "游戏库",
+            #[cfg(not(target_arch = "wasm32"))]
             Self::Installation => "安装",
             Self::Logs => "日志",
             Self::Debug => "调试",
@@ -98,6 +108,8 @@ impl Tab {
             Self::Statistics => "查看串流性能与网络状态",
             Self::Settings => "调整画质、延迟、音频与追踪",
             #[cfg(not(target_arch = "wasm32"))]
+            Self::GameLibrary => "设置 SteamVR 路径、免 Steam 直接启动游戏",
+            #[cfg(not(target_arch = "wasm32"))]
             Self::Installation => "维护 SteamVR 驱动与防火墙规则",
             Self::Logs => "查看运行日志与诊断信息",
             Self::Debug => "检查追踪、按键与触觉事件",
@@ -110,6 +122,8 @@ impl Tab {
             Self::Devices => icons::DEVICES,
             Self::Statistics => icons::MONITORING,
             Self::Settings => icons::SETTINGS,
+            #[cfg(not(target_arch = "wasm32"))]
+            Self::GameLibrary => icons::INSTALL_DESKTOP,
             #[cfg(not(target_arch = "wasm32"))]
             Self::Installation => icons::INSTALL_DESKTOP,
             Self::Logs => icons::DESCRIPTION,
@@ -132,6 +146,8 @@ pub struct Dashboard {
     connections_tab: DevicesTab,
     statistics_tab: StatisticsTab,
     settings_tab: SettingsTab,
+    #[cfg(not(target_arch = "wasm32"))]
+    game_library_tab: components::GameLibraryTab,
     #[cfg(not(target_arch = "wasm32"))]
     installation_tab: components::InstallationTab,
     logs_tab: LogsTab,
@@ -169,6 +185,23 @@ impl Dashboard {
 
         data_sources.request(ServerRequest::GetSession);
 
+        #[cfg(not(target_arch = "wasm32"))]
+        let (steamvr_path, steam_root) = {
+            let steamvr_path = creation_context
+                .storage
+                .and_then(|storage| storage.get_string(STEAMVR_PATH_STORAGE_KEY))
+                .unwrap_or_default();
+            let steam_root = creation_context
+                .storage
+                .and_then(|storage| storage.get_string(STEAM_ROOT_STORAGE_KEY))
+                .unwrap_or_default();
+
+            // Make the configured path effective for every launch entry point.
+            crate::steamvr_launcher::set_manual_steamvr_path(steamvr_path.clone());
+
+            (steamvr_path, steam_root)
+        };
+
         Self {
             data_sources,
             just_opened: true,
@@ -182,6 +215,8 @@ impl Dashboard {
             connections_tab: DevicesTab::new(),
             statistics_tab: StatisticsTab::new(),
             settings_tab: SettingsTab::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            game_library_tab: components::GameLibraryTab::new(steamvr_path, steam_root),
             #[cfg(not(target_arch = "wasm32"))]
             installation_tab: components::InstallationTab::new(),
             logs_tab: LogsTab::new(),
@@ -455,6 +490,10 @@ impl eframe::App for Dashboard {
                                 }
                             }
                             #[cfg(not(target_arch = "wasm32"))]
+                            Tab::GameLibrary => {
+                                self.game_library_tab.ui(ui);
+                            }
+                            #[cfg(not(target_arch = "wasm32"))]
                             Tab::Installation => {
                                 for request in self.installation_tab.ui(ui) {
                                     match request {
@@ -520,5 +559,13 @@ impl eframe::App for Dashboard {
                 "collapsed".into()
             },
         );
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            storage.set_string(
+                STEAMVR_PATH_STORAGE_KEY,
+                self.game_library_tab.steamvr_path(),
+            );
+            storage.set_string(STEAM_ROOT_STORAGE_KEY, self.game_library_tab.steam_root());
+        }
     }
 }

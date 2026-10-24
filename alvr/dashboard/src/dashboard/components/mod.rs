@@ -11,6 +11,8 @@ mod setup_wizard;
 mod statistics;
 
 #[cfg(not(target_arch = "wasm32"))]
+mod game_library;
+#[cfg(not(target_arch = "wasm32"))]
 mod installation;
 
 pub use about::*;
@@ -25,5 +27,7 @@ pub use settings_controls::*;
 pub use setup_wizard::*;
 pub use statistics::*;
 
+#[cfg(not(target_arch = "wasm32"))]
+pub use game_library::*;
 #[cfg(not(target_arch = "wasm32"))]
 pub use installation::*;
