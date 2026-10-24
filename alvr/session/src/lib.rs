@@ -60,6 +60,12 @@ pub struct OpenvrConfig {
     pub entropy_coding: u32,
     pub force_sw_encoding: bool,
     pub sw_thread_count: u32,
+
+    pub cast_mode: bool,
+    pub cast_monitor_index: i64,
+    pub cast_screen_size_percent: i64,
+    pub cast_stereo_separation_px: i64,
+    pub cast_capture_fps: i64,
     pub controller_is_tracker: bool,
     pub controllers_enabled: bool,
     pub body_tracking_vive_enabled: bool,

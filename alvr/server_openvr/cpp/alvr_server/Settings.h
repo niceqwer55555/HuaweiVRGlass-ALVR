@@ -60,6 +60,12 @@ public:
     bool m_fillerData;
     uint32_t m_entropyCoding;
     bool m_force_sw_encoding;
+
+    bool m_castMode;
+    uint32_t m_castMonitorIndex;
+    uint32_t m_castScreenSize;
+    uint32_t m_castStereoSeparationPx;
+    uint32_t m_castCaptureFps;
     uint32_t m_swThreadCount;
 
     uint32_t m_nvencTuningPreset;

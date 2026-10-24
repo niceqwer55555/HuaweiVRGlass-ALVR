@@ -15,7 +15,13 @@ param(
     [Parameter(Mandatory)]
     [string]$JavaHome,
     [Parameter(Mandatory)]
-    [string]$Keystore
+    [string]$Keystore,
+    # Huawei VR Glass DoF mode declared to the VR service. 6dof requires the Huawei tracking kit,
+    # 3dof uses the glasses IMU (rotation only).
+    [ValidateSet('3dof', '6dof')]
+    [string]$FreeDegree = '6dof',
+    # Also rewrite the checked in manifest so every following build uses the same mode.
+    [switch]$SyncSourceManifest
 )
 
 $ErrorActionPreference = 'Stop'
@@ -61,7 +67,51 @@ $classesRoot = Join-Path $workRoot 'classes'
 $dexRoot = Join-Path $workRoot 'dex'
 $packageRoot = Join-Path $workRoot 'package'
 $nativeRoot = Join-Path $packageRoot 'lib\armeabi-v7a'
-New-Item -ItemType Directory -Path $classesRoot, $dexRoot, $nativeRoot -Force | Out-Null
+$manifestBackupRoot = Join-Path $workRoot 'manifest'
+New-Item -ItemType Directory -Path $classesRoot, $dexRoot, $nativeRoot, $manifestBackupRoot -Force | Out-Null
+
+# DoF mode is declared to the Huawei VR service with this meta-data entry. Patch a copy of the
+# manifest so a normal build keeps using whatever is checked in.
+$packagedManifest = Join-Path $manifestBackupRoot 'AndroidManifest.xml'
+$manifestText = Get-Content -LiteralPath $manifest -Raw
+if ($manifestText -notmatch 'com\.huawei\.vr\.application\.freeDegree') {
+    throw "manifest 缺少 com.huawei.vr.application.freeDegree 声明：$manifest"
+}
+$patchedManifestText = [regex]::Replace(
+    $manifestText,
+    '(android:value=")(3dof|6dof)("\s*/?>\s*<!--?[^>]*?freeDegree)',
+    { param($m) $m.Groups[1].Value + $FreeDegree + $m.Groups[3].Value }
+)
+$patchedManifestText = [regex]::Replace(
+    $patchedManifestText,
+    '(com\.huawei\.vr\.application\.freeDegree"\s+android:value=")(3dof|6dof)(")',
+    "`${1}$FreeDegree`${3}"
+)
+if ($patchedManifestText -eq $manifestText) {
+    Write-Host "manifest freeDegree 已是 $FreeDegree，无需改写"
+} else {
+    Write-Host "manifest freeDegree -> $FreeDegree"
+}
+Set-Content -LiteralPath $packagedManifest -Value $patchedManifestText -NoNewline -Encoding UTF8
+if ($SyncSourceManifest) {
+    Copy-Item -LiteralPath $manifest "$manifest.bak.$(Get-Date -Format yyyyMMdd_HHmmss)" -Force
+    Set-Content -LiteralPath $manifest -Value $patchedManifestText -NoNewline -Encoding UTF8
+    Write-Host "已写回仓库 manifest（备份在 $manifest.bak.*）"
+
+    $clientManifest = Join-Path $clientRoot 'Cargo.toml'
+    $clientManifestText = Get-Content -LiteralPath $clientManifest -Raw
+    $patchedClientManifestText = [regex]::Replace(
+        $clientManifestText,
+        '(com\.huawei\.vr\.application\.freeDegree"\s*\]\s*\r?\nvalue = ")(3dof|6dof)(")',
+        "`${1}$FreeDegree`${3}"
+    )
+    if ($patchedClientManifestText -ne $clientManifestText) {
+        Copy-Item -LiteralPath $clientManifest "$clientManifest.bak.$(Get-Date -Format yyyyMMdd_HHmmss)" -Force
+        Set-Content -LiteralPath $clientManifest -Value $patchedClientManifestText -NoNewline -Encoding UTF8
+        Write-Host "已同步 Cargo.toml 的 freeDegree -> $FreeDegree"
+    }
+}
+$manifest = $packagedManifest
 
 $promptRoot = Join-Path $workRoot 'hvrprompt'
 New-Item -ItemType Directory -Path $promptRoot -Force | Out-Null

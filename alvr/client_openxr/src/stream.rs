@@ -9,7 +9,7 @@ use alvr_client_core::{
 use alvr_common::{
     anyhow::Result,
     error,
-    glam::{UVec2, Vec2},
+    glam::{UVec2, Vec2, Vec3},
     parking_lot::RwLock,
     Pose, RelaxedAtomic, ViewParams, HAND_LEFT_ID, HAND_RIGHT_ID, HEAD_ID,
 };
@@ -22,7 +22,7 @@ use alvr_graphics::{
 use alvr_packets::{FaceData, RealTimeConfig, StreamConfig};
 use alvr_session::{
     ClientsideFoveationConfig, ClientsideFoveationMode, ClientsidePostProcessingConfig, CodecType,
-    FoveatedEncodingConfig, MediacodecProperty, PassthroughMode, UpscalingConfig,
+    FoveatedEncodingConfig, MediacodecProperty, PassthroughMode, ThreeDofConfig, UpscalingConfig,
 };
 use alvr_system_info::Platform;
 use openxr as xr;
@@ -53,6 +53,10 @@ pub struct ParsedStreamConfig {
     pub buffering_history_weight: f32,
     pub decoder_options: Vec<(String, MediacodecProperty)>,
     pub interaction_sources: InteractionSourcesConfig,
+    // Huawei VR Glass can run either in 6DoF (tracking kit connected) or in 3DoF (glasses IMU
+    // only). The picture reaching the client does not change, only the amount of tracking data we
+    // are allowed to believe in.
+    pub three_dof: Option<ThreeDofConfig>,
 }
 
 impl ParsedStreamConfig {
@@ -87,6 +91,7 @@ impl ParsedStreamConfig {
             buffering_history_weight: config.settings.video.buffering_history_weight,
             decoder_options: config.settings.video.mediacodec_extra_options.clone(),
             interaction_sources: InteractionSourcesConfig::new(config),
+            three_dof: config.settings.headset.three_dof.as_option().cloned(),
         }
     }
 }
@@ -340,6 +345,7 @@ impl StreamContext {
             let stage_reference_space = Arc::clone(&self.stage_reference_space);
             let view_reference_space = Arc::clone(&self.view_reference_space);
             let refresh_rate = self.config.refresh_rate_hint;
+            let three_dof_config = self.config.three_dof.clone();
             let running = Arc::clone(&self.input_thread_running);
             move || {
                 stream_input_loop(
@@ -349,6 +355,7 @@ impl StreamContext {
                     &stage_reference_space,
                     &view_reference_space,
                     refresh_rate,
+                    three_dof_config,
                     running,
                 )
             }
@@ -440,6 +447,7 @@ impl StreamContext {
                 self.platform,
                 Some(vsync_time),
                 state,
+                self.config.three_dof.as_ref(),
             )
             .ok();
         }
@@ -659,6 +667,7 @@ fn poll_stream_inputs(
     platform: Platform,
     now_override: Option<Duration>,
     state: &mut StreamInputState,
+    three_dof_config: Option<&ThreeDofConfig>,
 ) -> Result<(), ()> {
     let int_ctx = &*interaction_ctx.read();
     if let Err(e) = xr_session.sync_actions(&[(&int_ctx.action_set).into()]) {
@@ -680,7 +689,7 @@ fn poll_stream_inputs(
 
     let target_time = now + core_ctx.get_total_prediction_offset();
 
-    let Some((head_motion, local_views)) = interaction::get_head_data(
+    let Some((mut head_motion, local_views)) = interaction::get_head_data(
         xr_session,
         platform,
         stage_reference_space,
@@ -692,6 +701,19 @@ fn poll_stream_inputs(
     ) else {
         return Ok(());
     };
+
+    // Huawei glasses are either tracked by the 6DoF kit or by their own IMU (3DoF). Even when the
+    // runtime keeps reporting a position, ignore it and keep the rotation only, otherwise the
+    // picture drifts or shakes on devices without positional tracking.
+    if let Some(three_dof) = three_dof_config {
+        let mut height = three_dof.eye_height_m;
+        if three_dof.prefer_runtime_height && head_motion.pose.position.y > 0.2 {
+            height = head_motion.pose.position.y;
+        }
+
+        head_motion.pose.position = Vec3::new(0.0, height, 0.0);
+        head_motion.linear_velocity = Vec3::ZERO;
+    }
 
     if let Some(views) = local_views {
         if platform.is_huawei() {
@@ -802,6 +824,7 @@ fn stream_input_loop(
     stage_reference_space: &xr::Space,
     view_reference_space: &xr::Space,
     refresh_rate: f32,
+    three_dof_config: Option<ThreeDofConfig>,
     running: Arc<RelaxedAtomic>,
 ) {
     let platform = alvr_system_info::platform();
@@ -819,6 +842,7 @@ fn stream_input_loop(
             platform,
             None,
             &mut state,
+            three_dof_config.as_ref(),
         )
         .is_err()
         {

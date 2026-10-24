@@ -1277,6 +1277,60 @@ pub enum RotationRecenteringMode {
     Tilted,
 }
 
+#[derive(SettingsSchema, Serialize, Deserialize, Clone, PartialEq)]
+#[schema(collapsible)]
+pub struct ThreeDofConfig {
+    #[schema(strings(
+        display_name = "Eye height",
+        help = "Height of the virtual viewpoint above the recentered play space origin. Since 3DoF mode has no positional tracking, the head is placed at a fixed height instead. Follow SteamVR standing convention, e.g. 1.6 for standing or 1.2 for seated."
+    ))]
+    #[schema(flag = "real-time")]
+    #[schema(gui(slider(min = 0.5, max = 2.2, step = 0.05)), suffix = "m")]
+    pub eye_height_m: f32,
+
+    #[schema(strings(
+        display_name = "Prefer runtime head height",
+        help = "Some runtimes keep reporting a plausible standing height even without positional tracking. When enabled and that height is above 0.2 m, it is used instead of the eye height above."
+    ))]
+    #[schema(flag = "real-time")]
+    pub prefer_runtime_height: bool,
+}
+
+#[derive(SettingsSchema, Serialize, Deserialize, Clone, PartialEq)]
+#[schema(collapsible)]
+pub struct CastConfig {
+    #[schema(strings(
+        display_name = "Monitor index",
+        help = "Zero based index of the monitor to duplicate, as enumerated by Windows. 0 is normally the primary external or built-in display."
+    ))]
+    #[schema(flag = "steamvr-restart")]
+    pub monitor_index: u32,
+
+    #[schema(strings(
+        display_name = "Screen size",
+        help = "Angular size of the virtual screen, as a fraction of the streamed view. 1.0 fills the whole field of view, lower values leave a black margin around the desktop."
+    ))]
+    #[schema(flag = "steamvr-restart")]
+    #[schema(gui(slider(min = 0.4, max = 1.0, step = 0.05)))]
+    pub screen_size: f32,
+
+    #[schema(strings(
+        display_name = "Stereo separation",
+        help = "Horizontal pixel offset applied between the two eyes. Zero renders the same image to both eyes, which reads as a flat screen at a distance. Higher values pull the screen nearer, at the cost of eye strain if exaggerated."
+    ))]
+    #[schema(flag = "steamvr-restart")]
+    #[schema(gui(slider(min = 0, max = 64, step = 1)), suffix = "px")]
+    pub stereo_separation_px: u32,
+
+    #[schema(strings(
+        display_name = "Capture frame rate",
+        help = "Desktop capture frame rate. Higher values look smoother but cost more CPU or GPU time before encoding."
+    ))]
+    #[schema(flag = "steamvr-restart")]
+    #[schema(gui(slider(min = 24, max = 90, step = 1)), suffix = "Hz")]
+    pub capture_fps: u32,
+}
+
 #[derive(SettingsSchema, Serialize, Deserialize, Clone)]
 pub struct HeadsetConfig {
     #[schema(strings(
@@ -1324,6 +1378,20 @@ Tilted: the world gets tilted when long pressing the oculus button. This is usef
     ))]
     #[schema(gui(slider(min = 0, max = 200, step = 5)), suffix = "ms")]
     pub max_prediction_ms: u64,
+
+    #[schema(strings(
+        display_name = "3DoF mode",
+        help = r#"Ignore positional tracking and use head rotation only. Useful with Huawei VR Glass without the 6DoF kit, or to remove positional jitter. The viewpoint is locked at a fixed eye height above the recentered play space origin."#
+    ))]
+    #[schema(flag = "real-time")]
+    pub three_dof: Switch<ThreeDofConfig>,
+
+    #[schema(strings(
+        display_name = "Desktop cast mode",
+        help = r#"Replace the SteamVR picture with the PC desktop, shown as a flat virtual screen in front of you. Requires a SteamVR restart."#
+    ))]
+    #[schema(flag = "steamvr-restart")]
+    pub cast: Switch<CastConfig>,
 }
 
 #[derive(SettingsSchema, Serialize, Deserialize, Clone, Copy)]
@@ -2086,6 +2154,24 @@ pub fn session_settings_default() -> SettingsDefault {
             },
             rotation_recentering_mode: RotationRecenteringModeDefault {
                 variant: RotationRecenteringModeDefaultVariant::Yaw,
+            },
+            three_dof: SwitchDefault {
+                enabled: false,
+                content: ThreeDofConfigDefault {
+                    gui_collapsed: true,
+                    eye_height_m: 1.6,
+                    prefer_runtime_height: true,
+                },
+            },
+            cast: SwitchDefault {
+                enabled: false,
+                content: CastConfigDefault {
+                    gui_collapsed: false,
+                    monitor_index: 0,
+                    screen_size: 0.9,
+                    stereo_separation_px: 0,
+                    capture_fps: 60,
+                },
             },
             max_prediction_ms: 100,
         },

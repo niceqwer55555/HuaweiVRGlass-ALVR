@@ -187,7 +187,7 @@ impl Dashboard {
 
         #[cfg(not(target_arch = "wasm32"))]
         let (steamvr_path, steam_root) = {
-            let steamvr_path = creation_context
+            let mut steamvr_path = creation_context
                 .storage
                 .and_then(|storage| storage.get_string(STEAMVR_PATH_STORAGE_KEY))
                 .unwrap_or_default();
@@ -196,8 +196,15 @@ impl Dashboard {
                 .and_then(|storage| storage.get_string(STEAM_ROOT_STORAGE_KEY))
                 .unwrap_or_default();
 
-            // Make the configured path effective for every launch entry point.
-            crate::steamvr_launcher::set_manual_steamvr_path(steamvr_path.clone());
+            // The sidecar file written by main() is the authoritative store.
+            // Only overwrite it when the UI storage actually has a value;
+            // otherwise an empty storage would wipe the persisted path and the
+            // user would have to set the SteamVR path on every launch.
+            if steamvr_path.trim().is_empty() {
+                steamvr_path = crate::steamvr_launcher::manual_steamvr_path();
+            } else {
+                crate::steamvr_launcher::set_manual_steamvr_path(steamvr_path.clone());
+            }
 
             (steamvr_path, steam_root)
         };

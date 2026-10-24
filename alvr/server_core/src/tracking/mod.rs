@@ -127,6 +127,9 @@ impl TrackingManager {
         timestamp: Duration,
         device_motions: &[(u64, DeviceMotion)],
     ) {
+        // 3DoF mode ignores positional tracking, it is read once per tracking batch.
+        let three_dof_config = headset_config.three_dof.clone().into_option();
+
         let mut device_motion_configs = HashMap::new();
         device_motion_configs.insert(*HEAD_ID, MotionConfig::default());
         device_motion_configs.extend([
@@ -187,6 +190,21 @@ impl TrackingManager {
             if let Some(config) = device_motion_configs.get(&device_id) {
                 // Recenter
                 motion = self.recenter_motion(motion);
+
+                // 3DoF: keep the orientation only. The viewpoint is locked at the play space
+                // origin, at the configured eye height. Both eyes keep their IPD offset, which
+                // comes from the view params sent by the client instead.
+                if device_id == *HEAD_ID {
+                    if let Some(three_dof) = &three_dof_config {
+                        let mut height = three_dof.eye_height_m;
+                        if three_dof.prefer_runtime_height && motion.pose.position.y > 0.2 {
+                            height = motion.pose.position.y;
+                        }
+
+                        motion.pose.position = Vec3::new(0.0, height, 0.0);
+                        motion.linear_velocity = Vec3::ZERO;
+                    }
+                }
 
                 // Apply custom transform
                 motion.pose.orientation *= config.pose_offset.orientation;

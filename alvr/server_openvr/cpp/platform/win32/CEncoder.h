@@ -4,6 +4,7 @@
 #include "shared/threadtools.h"
 
 #include "FrameRender.h"
+#include "DesktopCapture.h"
 #include "VideoEncoder.h"
 #include "VideoEncoderAMF.h"
 #include "VideoEncoderNVENC.h"
@@ -69,6 +70,9 @@ public:
     void CaptureFrame();
 
 private:
+    // Desktop cast mode renders the duplicated desktop instead of the compositor layers.
+    bool RenderCastFrame();
+
     CThreadEvent m_newFrameReady, m_encodeFinished;
     std::shared_ptr<VideoEncoder> m_videoEncoder;
     bool m_bExiting;
@@ -76,6 +80,8 @@ private:
     uint64_t m_targetTimestampNs;
 
     std::shared_ptr<FrameRender> m_FrameRender;
+
+    std::unique_ptr<DesktopCapture> m_desktopCapture;
 
     IDRScheduler m_scheduler;
 };

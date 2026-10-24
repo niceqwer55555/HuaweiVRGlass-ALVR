@@ -82,6 +82,13 @@ void Settings::Load() {
         m_amdBitrateCorruptionFix = (bool)config.get("amd_bitrate_corruption_fix").get<bool>();
         m_nvencQualityPreset = (uint32_t)config.get("nvenc_quality_preset").get<int64_t>();
         m_force_sw_encoding = config.get("force_sw_encoding").get<bool>();
+
+        m_castMode = config.get("cast_mode").get<bool>();
+        m_castMonitorIndex = (uint32_t)config.get("cast_monitor_index").get<int64_t>();
+        m_castScreenSize = (uint32_t)config.get("cast_screen_size_percent").get<int64_t>();
+        m_castStereoSeparationPx
+            = (uint32_t)config.get("cast_stereo_separation_px").get<int64_t>();
+        m_castCaptureFps = (uint32_t)config.get("cast_capture_fps").get<int64_t>();
         m_swThreadCount = (int32_t)config.get("sw_thread_count").get<int64_t>();
 
         m_nvencTuningPreset = (uint32_t)config.get("nvenc_tuning_preset").get<int64_t>();

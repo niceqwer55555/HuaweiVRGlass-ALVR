@@ -158,6 +158,8 @@ pub fn contruct_openvr_config(session: &SessionConfig) -> OpenvrConfig {
         false
     };
 
+    let cast = settings.headset.cast.clone().into_option();
+
     let nvenc_overrides = settings.video.encoder_config.nvenc;
     let amf_controls = settings.video.encoder_config.amf;
     let hdr_controls = settings.video.encoder_config.hdr;
@@ -188,6 +190,17 @@ pub fn contruct_openvr_config(session: &SessionConfig) -> OpenvrConfig {
             .software
             .force_software_encoding,
         sw_thread_count: settings.video.encoder_config.software.thread_count,
+        cast_mode: cast.is_some(),
+        cast_monitor_index: cast.as_ref().map(|c| c.monitor_index as i64).unwrap_or(0),
+        cast_screen_size_percent: cast
+            .as_ref()
+            .map(|c| (c.screen_size.clamp(0.05, 1.0) * 100.0) as i64)
+            .unwrap_or(90),
+        cast_stereo_separation_px: cast
+            .as_ref()
+            .map(|c| c.stereo_separation_px as i64)
+            .unwrap_or(0),
+        cast_capture_fps: cast.as_ref().map(|c| c.capture_fps as i64).unwrap_or(60),
         controllers_enabled,
         controller_is_tracker,
         body_tracking_vive_enabled,
