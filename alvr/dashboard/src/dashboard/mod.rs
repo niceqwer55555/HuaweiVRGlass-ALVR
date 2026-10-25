@@ -64,6 +64,8 @@ enum Tab {
     Devices,
     Statistics,
     Settings,
+    #[cfg(windows)]
+    WiredDisplay,
     #[cfg(not(target_arch = "wasm32"))]
     GameLibrary,
     #[cfg(not(target_arch = "wasm32"))]
@@ -77,6 +79,8 @@ const TABS: &[Tab] = &[
     Tab::Devices,
     Tab::Statistics,
     Tab::Settings,
+    #[cfg(windows)]
+    Tab::WiredDisplay,
     #[cfg(not(target_arch = "wasm32"))]
     Tab::GameLibrary,
     #[cfg(not(target_arch = "wasm32"))]
@@ -92,6 +96,8 @@ impl Tab {
             Self::Devices => "设备",
             Self::Statistics => "统计",
             Self::Settings => "设置",
+            #[cfg(windows)]
+            Self::WiredDisplay => "有线投屏",
             #[cfg(not(target_arch = "wasm32"))]
             Self::GameLibrary => "游戏库",
             #[cfg(not(target_arch = "wasm32"))]
@@ -107,6 +113,8 @@ impl Tab {
             Self::Devices => "管理有线与无线客户端连接",
             Self::Statistics => "查看串流性能与网络状态",
             Self::Settings => "调整画质、延迟、音频与追踪",
+            #[cfg(windows)]
+            Self::WiredDisplay => "有线模式下把眼镜当显示器：选分辨率、旋转、投屏",
             #[cfg(not(target_arch = "wasm32"))]
             Self::GameLibrary => "设置 SteamVR 路径、免 Steam 直接启动游戏",
             #[cfg(not(target_arch = "wasm32"))]
@@ -122,6 +130,8 @@ impl Tab {
             Self::Devices => icons::DEVICES,
             Self::Statistics => icons::MONITORING,
             Self::Settings => icons::SETTINGS,
+            #[cfg(windows)]
+            Self::WiredDisplay => icons::MONITORING,
             #[cfg(not(target_arch = "wasm32"))]
             Self::GameLibrary => icons::INSTALL_DESKTOP,
             #[cfg(not(target_arch = "wasm32"))]
@@ -146,6 +156,8 @@ pub struct Dashboard {
     connections_tab: DevicesTab,
     statistics_tab: StatisticsTab,
     settings_tab: SettingsTab,
+    #[cfg(windows)]
+    wired_display_tab: components::WiredDisplayTab,
     #[cfg(not(target_arch = "wasm32"))]
     game_library_tab: components::GameLibraryTab,
     #[cfg(not(target_arch = "wasm32"))]
@@ -222,6 +234,8 @@ impl Dashboard {
             connections_tab: DevicesTab::new(),
             statistics_tab: StatisticsTab::new(),
             settings_tab: SettingsTab::new(),
+            #[cfg(windows)]
+            wired_display_tab: components::WiredDisplayTab::new(),
             #[cfg(not(target_arch = "wasm32"))]
             game_library_tab: components::GameLibraryTab::new(steamvr_path, steam_root),
             #[cfg(not(target_arch = "wasm32"))]
@@ -495,6 +509,10 @@ impl eframe::App for Dashboard {
                                     self.applied_dark_mode = resolved_dark_mode;
                                     context.request_repaint();
                                 }
+                            }
+                            #[cfg(windows)]
+                            Tab::WiredDisplay => {
+                                self.wired_display_tab.ui(ui);
                             }
                             #[cfg(not(target_arch = "wasm32"))]
                             Tab::GameLibrary => {
