@@ -158,33 +158,74 @@ fn unblock_alvr_driver_within_vrsettings(text: &str) -> Result<String> {
     Ok(serde_json::to_string_pretty(&settings)?)
 }
 
+/// Sidecar file next to the dashboard executable. One EDID keyword per line (or
+/// comma separated). When it is missing the built-in list is used.
+const GLASSES_EDID_FILE: &str = "glasses_edid.txt";
+
+/// The glasses are a plain DisplayPort panel, so they are identified by the
+/// monitor EDID they report. `RTK2560` is the Realtek bridge inside the HUAWEI
+/// VR Glass; the rest are fallbacks for other reports.
+const DEFAULT_GLASSES_KEYWORDS: &[&str] = &["RTK2560", "HUAWEI", "VRGLASS", "VR GLASS"];
+
+fn glasses_edid_keywords() -> Vec<String> {
+    let mut dir = match std::env::current_exe().ok() {
+        Some(dir) => dir,
+        None => return DEFAULT_GLASSES_KEYWORDS.iter().map(|s| s.to_string()).collect(),
+    };
+    dir.pop();
+
+    if let Ok(text) = fs::read_to_string(dir.join(GLASSES_EDID_FILE)) {
+        let keywords = text
+            .split(|c: char| c == ',' || c == '\n' || c == '\r')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
+
+        if !keywords.is_empty() {
+            return keywords;
+        }
+    }
+
+    DEFAULT_GLASSES_KEYWORDS.iter().map(|s| s.to_string()).collect()
+}
+
 /// Huawei VR Glass: the glasses have a single USB-C port, so ALVR and the official
 /// wired driver can never work at the same time - whichever one SteamVR activates
 /// decides whether you get a picture at all.
 ///
-/// Policy: default to the official wired driver. Only fall back to ALVR when a
-/// phone is actually attached over USB, because that is the only situation where
-/// the glasses are on the phone instead of on the PC.
+/// Policy: ask the hardware, not the phone. The headset is only a DisplayPort
+/// panel (the phone is the computer), so when it is plugged into this PC it shows
+/// up as a monitor and EDID says so. Found -> official wired wins; not found ->
+/// the glasses must be on the phone, so ALVR (over WiFi) wins.
+///
+/// Note that ALVR's own "wired" mode (adb forward over a PC<->phone USB cable)
+/// cannot apply here: the glasses occupy the phone's only USB-C port, so the
+/// phone can only reach the PC over WiFi.
 ///
 /// SteamVR reads the enable flags while starting up, so this must run before it
 /// is launched.
 fn apply_auto_driver_selection() {
-    let adb_path = adb::get_adb_path(&crate::get_filesystem_layout());
-    let usb_serials = adb_path
-        .as_deref()
-        .and_then(|path| adb::list_usb_device_serials(path).ok())
-        .unwrap_or_default();
-    let usb_phone = !usb_serials.is_empty();
+    let keywords = glasses_edid_keywords();
+    let glasses_on_pc = alvr_server_io::is_glasses_attached_to_pc(&keywords);
 
-    match alvr_server_io::apply_auto_driver_selection(usb_phone) {
+    match alvr_server_io::apply_auto_driver_selection(glasses_on_pc) {
         Ok(Some(winner)) => {
-            debug!("Auto driver selection: using {winner} (phone on USB: {usb_phone})")
+            debug!("Auto driver selection: using {winner} (glasses on PC: {glasses_on_pc})")
         }
         Ok(None) => debug!("Auto driver selection: skipped, no Huawei driver registered"),
         Err(err) => warn!("Auto driver selection failed: {err:?}"),
     }
 
-    if usb_phone {
+    // The phone normally is NOT on USB (its port is taken by the glasses), so
+    // this is usually empty. Keep it for the rare case where adb is reachable.
+    let adb_path = adb::get_adb_path(&crate::get_filesystem_layout());
+    let usb_serials = adb_path
+        .as_deref()
+        .and_then(|path| adb::list_usb_device_serials(path).ok())
+        .unwrap_or_default();
+
+    if !usb_serials.is_empty() {
         if let Some(path) = adb_path.as_deref() {
             launch_huawei_vr_client(path, &usb_serials);
         }
