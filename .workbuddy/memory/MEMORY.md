@@ -25,6 +25,47 @@
   即为脚本校验期望的那份 loader（SHA256 7D2CD6D4…E1B337），classes.dex / res / AndroidManifest 也已含 hvrbridge 与 hvrprompt 产物
 - 缺 jar/aar 时用 `scripts/huawei/repack-huawei-client.ps1`，以既有 APK 为模板换 .so 后 zipalign -p + apksigner
 
+## 【硬编码结论：Windows 侧确认无解，别再试魔改驱动】
+- 本机 GPU = **Van Gogh / `PCI\VEN_1002&DEV_163F&SUBSYS_01231002&REV_AE`**，驱动 `31.0.14033.2008`（Valve OEM，`oem3.inf` / `u0388790.inf`，InfSection `ati2mtag_VanGogh`）
+- **魔改驱动包的判定标准只有一条：INF 里必须有 `ati2mtag_VanGogh` + `DEV_163F` 的 Models 段。**
+  没有就装不上（只会替换音频/GPIO 等无关组件，零收益）。
+- 已核验 `WHQL-AMD-Software-Hybrid-Edition-23.11.1-GCNFlex-Nebula-Native-DCH.7z`（Amernime Zone "Nebula" 23.11.1）：
+  90 个 INF 全无 `DEV_163F`、全无 `VanGogh` 字符串，支持族仅 Polaris/Vega/Navi/Renoir/Cezanne/Mendocino/DragonRange → **不可用于 Deck**
+- 只有 **Amernime Zone 23.3.1 "Remix Discovery Beta"（PVN-SoC APU）** 声明过
+  `ati2mtag_VanGogh, DEV_163F, REV_AE/E1/00`；guru3D 实测在 Deck 上装完首次报 Code 43，重启后能起但 **DXVA 不可用**（GPU-Z 显示无 DXVA）→ 仍拿不到硬编
+- 把 ROG Ally 驱动（`u0420842.inf`，同 APU 家族）的 Van Gogh 条目改 INF 装 Deck → 装得上但 **Code 43**，`amdkmdag.sys` 内部自检失败，需二进制级改动
+- 印证：Valve 官方 Windows 驱动**不含媒体引擎**（编解码授权问题），AMF/MF/VAAPI 三条路在 Windows 都不通
+- **唯一支持 Van Gogh 的魔改包位置**：Amernime SourceForge `Release Polaris-Vega-Navi/Release AMD SoC/`
+  （根目录的 `PolarisVegaNavi-*` 系列**都不含** 163F）。最新是 `...-23.11.1-PVN-AMDSoC-Nebula-Native-DCH.7z`
+- 该包 `MultiParse/*.inf` 的 catalog 是**伪造的微软证书**（`0CC5D26B…`，2039 到期），
+  `pnputil` 报 `0xE0000247` / 底层 `0x80096004`，**不开签名强制装不上**；
+  可改用 `MSFTParse/u0394729_msft.inf`（真 AMD 签名，改名 `u0394729.inf`）+ 其 cat
+  + 用 `WT6A_INF/B397235` 的真实文件填 `B395833` 的 0 字节占位 → 能装成 `oem49.inf`
+- **装了也是 Code 43**：`amdkmdag.sys` 对 Deck 硬件自检失败（用户态 atieclxx 正常），
+  与 guru3D 社区报告一致；社区称冷重启后能起但 **DXVA 仍不可用**。故 Windows 硬编仍无解
+- **【2026-10-25 已完成实测】** 冷重启后 oem49.inf 状态 OK、WDDM 2.7、Feature Level 12_1、
+  无 Code 43，**但媒体引擎依然为零**：`h264_amf`/`hevc_amf` 均 `Init() failed error 1`；
+  `d3d11va`/`dxva2` 硬解均初始化失败；`AMDh265Encoder` 硬件 MFT 虽注册且 CoCreateInstance=S_OK，
+  但 `ActivateObject` 失败（`hevc_mf` 报 could not create MFT）；dxdiag 的 `HardwareMFT` 键为空。
+  D3D11 设备本身正常（已排除）。换过与 KMD 配套的 AMF 三件套
+  （`amfrt64.dll` 133168 / `amfrtdrv64.dll` 10345624 / `amdenc64.dll` 1238760，来源 `WT6A_INF/B397235`）
+  仍无效 → **AZ SoC 驱动只能修 Code 43，拿不到 VCN。Windows 硬编这条路彻底封死**
+- 覆盖 System32 里被占用的 DLL：`cp` 会 `Device or resource busy`，须先
+  `mv x.dll x.dll.old_lock` 再落新文件
+- **回滚已完成**（2026-10-25 11:00 冷重启后确认）：`oem49.inf` 已删，设备绑回 `oem3.inf`
+  Valve `31.0.14033.2008`，`Status=OK`；System32 的 AMF 三件套是原始版
+  （`amfrt64.dll` 147472 / `amfrtdrv64.dll` 21878800 / `amdenc64.dll` 1258848，
+  其中前两个实际版本 32.0.22042.14002，配 Valve KMD 并不严格配套但就是本机原始状态）
+- ⚠️ `build/end/` 曾被清空过，曾经的 `driver_backup_20261025/`、`amf_backup_20261025/`、
+  `restore-gpu-driver.ps1`、`Test-HwCodec.ps1`、`diagnose-amf.py` **现在都不在了**。
+  `scripts/huawei/restore-gpu-driver.ps1` 只是转发到 `build/end/restore-gpu-driver.ps1`
+  → **该转发入口已悬空**。再要回滚只能 `pnputil /add-driver <u0388790.inf> /install`，
+  Valve 驱动包本体仍在 `C:\Windows\System32\DriverStore\FileRepository\u0388790.inf_amd64_*`
+- `build/end/` 现在的定位 = **成品包**（`server/` + `client/`），详见其中 `README.md`
+- PowerShell 5.1 按 ANSI 解析无 BOM 的 UTF-8，中文注释会让解析器直接崩
+  → `build/end/` 里的 `.ps1` / `.bat` 一律保持 ASCII，不要加中文注释
+- 因此 **Windows 侧唯一可行 = CPU 软编（x264）**；要硬编必须回 SteamOS 走 VAAPI（见 `steamos/SteamOS迁移手册.md`）
+
 ## 【最重要的前提】唯一可用的客户端二进制 = 原作者 2026-08-15 的 .so
 - `build/HuaweiVRGlass_ALVR_Android_v0.5.0.apk` 内 `lib/armeabi-v7a/libalvr_client_openxr.so`
   （67,581,504 B，CRC32 99a093b0，SHA256 80068d91…02bd8，编译于 2026-08-15 12:55）是**已验证能出画面的唯一版本**
