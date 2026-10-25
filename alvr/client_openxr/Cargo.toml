@@ -27,7 +27,7 @@ jni = "0.21"
 libc = "0.2"
 ndk = { version = "0.9", features = ["nativewindow"] }
 ndk-context = "0.1"
-openxr = { path = "../../deps/openxrs-huawei/openxr", features = ["huawei-loader-linked", "huawei-openxr-1-0-3"] }
+openxr = { path = "../../deps/openxrs-huawei/openxr", features = ["huawei-loader-linked", "huawei-openxr-1-0-3", "linked"] }
 
 [package.metadata.android]
 package = "com.lht.huaweivr.alvr"

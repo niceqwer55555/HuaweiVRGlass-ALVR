@@ -114,12 +114,16 @@ impl HuaweiFramebufferRenderer {
     }
 
     pub fn render_view(&self, eye: usize) {
+        static RV_TRACE: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let trace = RV_TRACE.fetch_add(1, std::sync::atomic::Ordering::Relaxed) < 140;
+
         let gl = &self.context.gl_context;
 
-        unsafe {
-            let framebuffer = gl.get_parameter_i32(gl::FRAMEBUFFER_BINDING);
-            let framebuffer_status = gl.check_framebuffer_status(gl::FRAMEBUFFER);
+        if trace {
+            info!("[HVR-DIAG] rv eye {eye}: start");
+        }
 
+        unsafe {
             gl.disable(gl::SCISSOR_TEST);
             gl.viewport(
                 0,
@@ -131,8 +135,23 @@ impl HuaweiFramebufferRenderer {
             gl.clear_color(0.027, 0.078, 0.118, 1.0);
             gl.clear(gl::COLOR_BUFFER_BIT);
 
+            if trace {
+                info!("[HVR-DIAG] rv eye {eye}: cleared");
+            }
+
             self.ensure_resources();
+
+            if trace {
+                info!("[HVR-DIAG] rv eye {eye}: resources ok");
+            }
+
+            let hud_dirty = self.hud_dirty.get();
             self.update_texture_if_needed();
+
+            if trace {
+                info!("[HVR-DIAG] rv eye {eye}: texture ok (dirty={hud_dirty})");
+            }
+
             let resources = self.resources.borrow();
             let resources = resources.as_ref().unwrap();
             gl.use_program(Some(resources.program));
@@ -142,16 +161,36 @@ impl HuaweiFramebufferRenderer {
             gl.disable(gl::DEPTH_TEST);
             gl.disable(gl::CULL_FACE);
             gl.disable(gl::BLEND);
+
+            if trace {
+                info!("[HVR-DIAG] rv eye {eye}: state set");
+            }
+
             gl.draw_arrays(gl::TRIANGLE_STRIP, 0, 4);
             gl.flush();
 
-            let gl_error = gl.get_error();
+            if trace {
+                info!("[HVR-DIAG] rv eye {eye}: drawn");
+            }
+
             let eye_bit = 1_u8 << eye;
             if self.logged_eyes.get() & eye_bit == 0 {
+                // These queries are synchronous and block as soon as the GPU queue backs up, so
+                // only ask once per eye.
+                let framebuffer = gl.get_parameter_i32(gl::FRAMEBUFFER_BINDING);
+                let framebuffer_status = gl.check_framebuffer_status(gl::FRAMEBUFFER);
+                let gl_error = gl.get_error();
                 info!(
                     "[HVR-DIAG] Huawei direct framebuffer render: eye={eye}, fbo={framebuffer}, status=0x{framebuffer_status:X}, gl_error=0x{gl_error:X}"
                 );
                 self.logged_eyes.set(self.logged_eyes.get() | eye_bit);
+            }
+
+            if eye == 1 {
+                self.context.swap_huawei_buffers();
+                if trace {
+                    info!("[HVR-DIAG] rv eye {eye}: swapped");
+                }
             }
         }
     }
@@ -243,10 +282,10 @@ impl HuaweiStreamRenderer {
         }
 
         let gl = &self.context.gl_context;
-        let framebuffer = gl.get_parameter_i32(gl::FRAMEBUFFER_BINDING);
-        let framebuffer_status = gl.check_framebuffer_status(gl::FRAMEBUFFER);
 
         if self.gl_ready_eyes.get() & eye_bit == 0 {
+            let framebuffer = gl.get_parameter_i32(gl::FRAMEBUFFER_BINDING);
+            let framebuffer_status = gl.check_framebuffer_status(gl::FRAMEBUFFER);
             info!(
                 "[HVR-DIAG] Huawei direct stream GL state ready: eye={eye}, fbo={framebuffer}, status=0x{framebuffer_status:X}"
             );
@@ -304,12 +343,15 @@ impl HuaweiStreamRenderer {
                 self.context
                     .release_imported_hardware_buffer(imported_frame);
             }
+
+            self.context.swap_huawei_buffers();
         }
 
-        let gl_error = gl.get_error();
         if self.logged_eyes.get() & eye_bit == 0 {
+            // Synchronous queries block once the GPU queue backs up, so only ask once per eye.
+            let gl_error = gl.get_error();
             info!(
-                "[HVR-DIAG] Huawei direct stream render: eye={eye}, decoded={}, fbo={framebuffer}, status=0x{framebuffer_status:X}, gl_error=0x{gl_error:X}",
+                "[HVR-DIAG] Huawei direct stream render: eye={eye}, decoded={}, gl_error=0x{gl_error:X}",
                 !hardware_buffer.is_null()
             );
             self.logged_eyes.set(self.logged_eyes.get() | eye_bit);

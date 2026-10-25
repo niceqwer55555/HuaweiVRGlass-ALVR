@@ -628,24 +628,45 @@ fn connection_pipeline(
     );
 
     let fps = {
+        let preferred_fps = initial_settings.video.preferred_fps;
+
         let mut best_match = 0_f32;
         let mut min_diff = f32::MAX;
         for rate in &streaming_caps.supported_refresh_rates {
-            let diff = (*rate - initial_settings.video.preferred_fps).abs();
+            let diff = (*rate - preferred_fps).abs();
             if diff < min_diff {
                 best_match = *rate;
                 min_diff = diff;
             }
         }
-        best_match
-    };
 
-    if !streaming_caps
-        .supported_refresh_rates
-        .contains(&initial_settings.video.preferred_fps)
-    {
-        warn!("Chosen refresh rate not supported. Using {fps}Hz");
-    }
+        // The Huawei client binary cannot be rebuilt from source any more: the shipped .so is a
+        // black box that advertises a single 70Hz rate. Snapping back up to it would force the
+        // encoder to produce 70fps on a machine that can only afford a fraction of that, so a
+        // preferred_fps below every advertised rate is honoured instead.
+        let below_all_rates = preferred_fps > 0.0
+            && !streaming_caps.supported_refresh_rates.is_empty()
+            && streaming_caps
+                .supported_refresh_rates
+                .iter()
+                .all(|rate| *rate > preferred_fps);
+
+        if below_all_rates {
+            warn!(
+                "Encoding at {preferred_fps}Hz, below every rate the client advertises ({:?})",
+                streaming_caps.supported_refresh_rates
+            );
+            preferred_fps
+        } else {
+            if !streaming_caps
+                .supported_refresh_rates
+                .contains(&preferred_fps)
+            {
+                warn!("Chosen refresh rate not supported. Using {best_match}Hz");
+            }
+            best_match
+        }
+    };
 
     let enable_foveated_encoding =
         if let Switch::Enabled(config) = &initial_settings.video.foveated_encoding {

@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [ValidateSet('armeabi-v7a', 'arm64-v8a')]
     [string]$AndroidAbi = 'armeabi-v7a',

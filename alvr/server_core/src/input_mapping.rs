@@ -268,6 +268,26 @@ pub fn automatic_bindings(
         }
     }
 
+    // System buttons. The Huawei 3DoF remote reports the system button directly and has no
+    // separate menu button, so the "menu to system" remapping above never fires and pressing the
+    // only button on the remote did nothing at all: the SteamVR dashboard could not be opened from
+    // inside the headset. Pass the system button straight through when the client has no menu
+    // button of its own, which keeps Quest style controllers on their existing mapping.
+    if !s_set.contains(&*LEFT_MENU_CLICK_ID)
+        && s_set.contains(&*LEFT_SYSTEM_CLICK_ID)
+        && d_set.contains(&*LEFT_SYSTEM_CLICK_ID)
+    {
+        let click = click(*LEFT_SYSTEM_CLICK_ID);
+        bindings.extend(map_button_pair_automatic(click, click, config));
+    }
+    if !s_set.contains(&*RIGHT_MENU_CLICK_ID)
+        && s_set.contains(&*RIGHT_SYSTEM_CLICK_ID)
+        && d_set.contains(&*RIGHT_SYSTEM_CLICK_ID)
+    {
+        let click = click(*RIGHT_SYSTEM_CLICK_ID);
+        bindings.extend(map_button_pair_automatic(click, click, config));
+    }
+
     // A/X buttons
     if s_set.contains(&*LEFT_X_CLICK_ID) {
         let source = ct(s_set, *LEFT_X_CLICK_ID, *LEFT_X_TOUCH_ID);

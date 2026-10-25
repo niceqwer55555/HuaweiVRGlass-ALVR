@@ -1296,6 +1296,58 @@ pub struct ThreeDofConfig {
     pub prefer_runtime_height: bool,
 }
 
+// Huawei VR Glass can be used standalone (3DoF, glasses IMU only) or with the 6DoF tracking kit.
+// The same applies to other headsets where positional tracking may or may not be available at
+// runtime, so the choice is exposed as a three way mode instead of a plain on/off switch.
+#[derive(SettingsSchema, Serialize, Deserialize, Clone, PartialEq)]
+#[schema(gui = "button_group")]
+pub enum ThreeDofMode {
+    // Note: the variant order matters. Settings are sent to the client with bincode, which encodes
+    // the variant index, and older clients still declare this field as `Switch<ThreeDofConfig>`
+    // (Disabled = 0, Enabled = 1). Keeping "Auto" first makes old clients read it as "Disabled",
+    // so they never clamp the head pose and let the server decide, which is exactly what the Auto
+    // mode does. "On" is read as "Enabled" with the same payload, so it behaves the same too.
+    #[schema(strings(
+        display_name = "Auto",
+        help = "Detect positional tracking at runtime: as soon as a controller reports a real position the head pose is left untouched; if no 6DoF controller shows up within a few seconds the head is locked at the configured eye height. Controllers that only report rotation (like the Huawei 3DoF remote) do not count as 6DoF."
+    ))]
+    Auto(ThreeDofConfig),
+
+    #[schema(strings(
+        display_name = "Always on",
+        help = "Always ignore positional tracking and lock the viewpoint at the configured eye height, even when 6DoF controllers are connected."
+    ))]
+    On(ThreeDofConfig),
+
+    #[schema(strings(
+        display_name = "Off",
+        help = "Never touch the head pose. Use this when the headset really has positional tracking, for example Huawei VR Glass with a working 6DoF kit. Requires an up to date client."
+    ))]
+    Off,
+}
+
+impl ThreeDofMode {
+    /// 3DoF compensation to apply unconditionally, regardless of what is tracked.
+    pub fn forced_config(&self) -> Option<&ThreeDofConfig> {
+        match self {
+            Self::Off | Self::Auto(_) => None,
+            Self::On(config) => Some(config),
+        }
+    }
+
+    /// 3DoF compensation to apply when no 6DoF controller has been detected.
+    pub fn auto_config(&self) -> Option<&ThreeDofConfig> {
+        match self {
+            Self::Off => None,
+            Self::Auto(config) | Self::On(config) => Some(config),
+        }
+    }
+
+    pub fn is_auto(&self) -> bool {
+        matches!(self, Self::Auto(_))
+    }
+}
+
 #[derive(SettingsSchema, Serialize, Deserialize, Clone, PartialEq)]
 #[schema(collapsible)]
 pub struct CastConfig {
@@ -1381,10 +1433,10 @@ Tilted: the world gets tilted when long pressing the oculus button. This is usef
 
     #[schema(strings(
         display_name = "3DoF mode",
-        help = r#"Ignore positional tracking and use head rotation only. Useful with Huawei VR Glass without the 6DoF kit, or to remove positional jitter. The viewpoint is locked at a fixed eye height above the recentered play space origin."#
+        help = r#"Ignore positional tracking and use head rotation only. Useful with Huawei VR Glass without the 6DoF kit, or to remove positional jitter. The viewpoint is locked at a fixed eye height above the recentered play space origin. "Auto" enables it only when no 6DoF controller is detected."#
     ))]
     #[schema(flag = "real-time")]
-    pub three_dof: Switch<ThreeDofConfig>,
+    pub three_dof: ThreeDofMode,
 
     #[schema(strings(
         display_name = "Desktop cast mode",
@@ -1744,7 +1796,9 @@ pub fn session_settings_default() -> SettingsDefault {
             bitrate: BitrateConfigDefault {
                 gui_collapsed: false,
                 mode: BitrateModeDefault {
-                    ConstantMbps: 30,
+                    // Headsets like Huawei VR Glass render 3200x1600@70Hz: 30 Mbps is far too low
+                    // and results in a blurry picture, 100 Mbps is a sane starting point.
+                    ConstantMbps: 100,
                     Adaptive: BitrateModeAdaptiveDefault {
                         gui_collapsed: true,
                         saturation_multiplier: 0.95,
@@ -1928,7 +1982,7 @@ pub fn session_settings_default() -> SettingsDefault {
                     contrast: 0.,
                     saturation: 0.5,
                     gamma: 1.,
-                    sharpening: 0.5,
+                    sharpening: 0.8,
                 },
             },
         },
@@ -2155,13 +2209,18 @@ pub fn session_settings_default() -> SettingsDefault {
             rotation_recentering_mode: RotationRecenteringModeDefault {
                 variant: RotationRecenteringModeDefaultVariant::Yaw,
             },
-            three_dof: SwitchDefault {
-                enabled: false,
-                content: ThreeDofConfigDefault {
+            three_dof: ThreeDofModeDefault {
+                Auto: ThreeDofConfigDefault {
                     gui_collapsed: true,
                     eye_height_m: 1.6,
                     prefer_runtime_height: true,
                 },
+                On: ThreeDofConfigDefault {
+                    gui_collapsed: true,
+                    eye_height_m: 1.6,
+                    prefer_runtime_height: true,
+                },
+                variant: ThreeDofModeDefaultVariant::Auto,
             },
             cast: SwitchDefault {
                 enabled: false,

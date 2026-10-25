@@ -23,7 +23,7 @@ use alvr_events::{EventType, TrackingEvent};
 use alvr_packets::{FaceData, Tracking};
 use alvr_session::{
     settings_schema::Switch, BodyTrackingConfig, HeadsetConfig, PositionRecenteringMode,
-    RotationRecenteringMode, Settings, VMCConfig,
+    RotationRecenteringMode, Settings, ThreeDofMode, VMCConfig,
 };
 use alvr_sockets::StreamReceiver;
 use std::{
@@ -31,10 +31,71 @@ use std::{
     collections::{HashMap, VecDeque},
     f32::consts::PI,
     sync::Arc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 const DEG_TO_RAD: f32 = PI / 180.0;
+
+// A controller is considered to have real positional tracking (6DoF) once it reports a position
+// clearly away from the tracking origin. 3DoF controllers, like the Huawei remote or a phone
+// controller, only report rotation, so their position stays at the origin.
+const SIX_DOF_POSITION_THRESHOLD_M: f32 = 0.05;
+// How long to wait for a 6DoF controller before deciding that the headset is 3DoF only.
+const SIX_DOF_DETECTION_TIMEOUT: Duration = Duration::from_secs(4);
+// How long a 6DoF controller is remembered after it stops being tracked.
+const SIX_DOF_LOST_TIMEOUT: Duration = Duration::from_secs(15);
+
+// Where rotation-only hands are placed relative to the 3DoF viewpoint. Without positional tracking
+// the hands would otherwise sit at the tracking origin, i.e. roughly an eye height below the
+// viewpoint, which is far outside the field of view.
+const THREE_DOF_HAND_LATERAL_M: f32 = 0.18;
+const THREE_DOF_HAND_DROP_M: f32 = -0.28;
+const THREE_DOF_HAND_FORWARD_M: f32 = -0.35;
+
+// Runtime detection of positional tracking, used by the "Auto" 3DoF mode.
+#[derive(Default)]
+struct AutoThreeDofState {
+    start: Option<Instant>,
+    last_seen: Option<Instant>,
+    six_dof: bool,
+    decided: bool,
+}
+
+impl AutoThreeDofState {
+    /// Returns true when the head pose must be reduced to rotation only (3DoF).
+    fn update(&mut self, six_dof_controller_seen: bool) -> bool {
+        let now = Instant::now();
+        let start = *self.start.get_or_insert(now);
+
+        if six_dof_controller_seen {
+            if !self.six_dof {
+                alvr_common::info!("[3DoF] 6DoF controller detected: keeping positional tracking");
+            }
+            self.six_dof = true;
+            self.decided = true;
+            self.last_seen = Some(now);
+
+            return false;
+        }
+
+        if self.six_dof {
+            let lost_for = now.duration_since(self.last_seen.unwrap_or(now));
+            if lost_for >= SIX_DOF_LOST_TIMEOUT {
+                alvr_common::info!(
+                    "[3DoF] 6DoF controller lost for {lost_for:?}: falling back to 3DoF tracking"
+                );
+                self.six_dof = false;
+            }
+        } else if !self.decided && now.duration_since(start) >= SIX_DOF_DETECTION_TIMEOUT {
+            alvr_common::info!(
+                "[3DoF] No 6DoF controller detected within {SIX_DOF_DETECTION_TIMEOUT:?}: enabling 3DoF tracking"
+            );
+            self.decided = true;
+        }
+
+        !self.six_dof && self.decided
+    }
+}
 
 #[derive(Debug)]
 pub enum HandType {
@@ -58,6 +119,7 @@ pub struct TrackingManager {
     hand_skeletons_history: [VecDeque<(Duration, [Pose; 26])>; 2],
     last_face_data: FaceData,
     max_history_size: usize,
+    auto_three_dof: AutoThreeDofState,
 }
 
 impl TrackingManager {
@@ -69,6 +131,7 @@ impl TrackingManager {
             hand_skeletons_history: [VecDeque::new(), VecDeque::new()],
             last_face_data: FaceData::default(),
             max_history_size,
+            auto_three_dof: AutoThreeDofState::default(),
         }
     }
 
@@ -127,8 +190,23 @@ impl TrackingManager {
         timestamp: Duration,
         device_motions: &[(u64, DeviceMotion)],
     ) {
-        // 3DoF mode ignores positional tracking, it is read once per tracking batch.
-        let three_dof_config = headset_config.three_dof.clone().into_option();
+        // 3DoF mode ignores positional tracking, it is read once per tracking batch. In "Auto" mode
+        // the decision is taken at runtime: the head pose is only clamped while no controller
+        // reports a real position, which is what happens on Huawei VR Glass without the 6DoF kit.
+        let three_dof_config = match &headset_config.three_dof {
+            ThreeDofMode::Off => None,
+            ThreeDofMode::On(config) => Some(config.clone()),
+            ThreeDofMode::Auto(config) => {
+                let six_dof_controller_seen = device_motions.iter().any(|(id, motion)| {
+                    (*id == *HAND_LEFT_ID || *id == *HAND_RIGHT_ID)
+                        && motion.pose.position.length() > SIX_DOF_POSITION_THRESHOLD_M
+                });
+
+                self.auto_three_dof
+                    .update(six_dof_controller_seen)
+                    .then(|| config.clone())
+            }
+        };
 
         let mut device_motion_configs = HashMap::new();
         device_motion_configs.insert(*HEAD_ID, MotionConfig::default());
@@ -182,10 +260,16 @@ impl TrackingManager {
             );
         }
 
+        let mut processed: Vec<(u64, DeviceMotion, bool)> = Vec::with_capacity(device_motions.len());
+        let mut three_dof_head_pose: Option<Pose> = None;
+
         for &(device_id, mut motion) in device_motions {
             if device_id == *HEAD_ID {
                 self.last_head_pose = motion.pose;
             }
+
+            // A 3DoF device reports rotation only, so its position stays at the tracking origin.
+            let rotation_only = motion.pose.position.length() < SIX_DOF_POSITION_THRESHOLD_M;
 
             if let Some(config) = device_motion_configs.get(&device_id) {
                 // Recenter
@@ -230,6 +314,70 @@ impl TrackingManager {
                     cutoff(motion.angular_velocity, config.angular_velocity_cutoff);
             }
 
+            if device_id == *HEAD_ID && three_dof_config.is_some() {
+                three_dof_head_pose = Some(motion.pose);
+            }
+
+            processed.push((device_id, motion, rotation_only));
+        }
+
+        // In 3DoF the hands have no position of their own: they stay at the tracking origin while
+        // the viewpoint is lifted to the configured eye height, so they end up buried at floor
+        // level and take the SteamVR dashboard (anchored to a controller) down with them. Anchor
+        // such rotation-only hands in front of the viewpoint, keeping their reported orientation.
+        if let Some(head_pose) = three_dof_head_pose {
+            for (device_id, motion, rotation_only) in &mut processed {
+                let lateral = if *device_id == *HAND_LEFT_ID {
+                    -1.0
+                } else if *device_id == *HAND_RIGHT_ID {
+                    1.0
+                } else {
+                    continue;
+                };
+
+                if !*rotation_only {
+                    continue;
+                }
+
+                motion.pose.position = head_pose.position
+                    + head_pose.orientation
+                        * Vec3::new(
+                            THREE_DOF_HAND_LATERAL_M * lateral,
+                            THREE_DOF_HAND_DROP_M,
+                            THREE_DOF_HAND_FORWARD_M,
+                        );
+                motion.linear_velocity = Vec3::ZERO;
+            }
+        }
+
+        // Temporary ground truth for the "everything sits on the floor" investigation: show what
+        // is actually pushed to SteamVR once per second or so.
+        {
+            use std::sync::atomic::{AtomicU32, Ordering as AtomicOrdering};
+
+            static POSE_DIAG_COUNTER: AtomicU32 = AtomicU32::new(0);
+
+            if POSE_DIAG_COUNTER.fetch_add(1, AtomicOrdering::Relaxed) % 35 == 0 {
+                let mut summary = String::new();
+                for (device_id, motion, rotation_only) in &processed {
+                    summary.push_str(&format!(
+                        " dev={device_id} pos=({:.2},{:.2},{:.2}) rot_only={rotation_only}",
+                        motion.pose.position.x,
+                        motion.pose.position.y,
+                        motion.pose.position.z,
+                    ));
+                }
+
+                alvr_common::info!(
+                    "[POSE-DIAG] three_dof_active={} devices={}{}",
+                    three_dof_head_pose.is_some(),
+                    processed.len(),
+                    summary
+                );
+            }
+        }
+
+        for (device_id, motion, _) in processed {
             if let Some(motions) = self.device_motions_history.get_mut(&device_id) {
                 motions.push_front((timestamp, motion));
 

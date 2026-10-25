@@ -155,6 +155,14 @@ impl HuaweiEglContext {
             .expect("failed to restore the Huawei EGL context");
     }
 
+    /// Pushes the rendered frame to the HVR surface. Without this the runtime compositor has
+    /// nothing to show and the GL command queue backs up until a synchronous call blocks.
+    pub fn swap_buffers(&self) {
+        unsafe {
+            let _ = self.egl.swap_buffers(self.display, self.surface);
+        }
+    }
+
     pub fn get_proc_address(&self, name: &str) -> *const c_void {
         self.egl
             .get_proc_address(name)
@@ -355,6 +363,15 @@ pub struct GraphicsContext {
 }
 
 impl GraphicsContext {
+    /// Pushes the rendered frame to the HVR surface. Without this the runtime compositor has
+    /// nothing to show and the GL command queue backs up until a synchronous call blocks.
+    #[cfg(target_os = "android")]
+    pub fn swap_huawei_buffers(&self) {
+        if let Some(huawei_egl) = &self.huawei_egl {
+            huawei_egl.swap_buffers();
+        }
+    }
+
     #[cfg(not(windows))]
     pub fn new_gl() -> Self {
         Self::new_gl_internal(None)

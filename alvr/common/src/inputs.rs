@@ -23,6 +23,14 @@ interaction_profile!(PICO_G3, "bytedance/pico_g3");
 interaction_profile!(FOCUS3, "htc/vive_focus3");
 interaction_profile!(YVR, "yvr/touch");
 interaction_profile!(HUAWEI, "huawei/6dof");
+// Huawei VR Glass also exposes a 3DoF session type (glasses IMU only, paired with the small
+// 3DoF remote / phone touchpad instead of the two 6DoF visual controllers). The runtime only
+// accepts the profile matching the current session, so both are registered and suggested.
+// The 3DoF profile is "/interaction_profiles/huawei/controller", which does not follow the
+// "<vendor>/<name>_controller" shape the macro above produces, hence the literal here.
+pub const HUAWEI_3DOF_CONTROLLER_PROFILE_PATH: &str = "/interaction_profiles/huawei/controller";
+pub static HUAWEI_3DOF_CONTROLLER_PROFILE_ID: Lazy<u64> =
+    Lazy::new(|| hash_string(HUAWEI_3DOF_CONTROLLER_PROFILE_PATH));
 
 macro_rules! devices {
     ($(($name:ident, $path:expr),)*) => {
@@ -520,6 +528,39 @@ pub static CONTROLLER_PROFILE_INFO: Lazy<HashMap<u64, InteractionProfileInfo>> =
                     *RIGHT_THUMBSTICK_Y_ID,
                     *RIGHT_THUMBSTICK_CLICK_ID,
                     *RIGHT_THUMBSTICK_TOUCH_ID,
+                ]
+                .into_iter()
+                .collect(),
+            },
+        ),
+        (
+            *HUAWEI_3DOF_CONTROLLER_PROFILE_ID,
+            InteractionProfileInfo {
+                path: HUAWEI_3DOF_CONTROLLER_PROFILE_PATH,
+                // Only inputs the Huawei runtime advertises for `/interaction_profiles/huawei/controller`
+                // are listed (see the input paths inside libvrsdk.so): suggesting an unsupported path
+                // makes xrSuggestInteractionProfileBindings fail for the whole profile.
+                button_set: [
+                    *LEFT_SYSTEM_CLICK_ID,
+                    *LEFT_MENU_CLICK_ID,
+                    *LEFT_BACK_CLICK_ID,
+                    *LEFT_TRIGGER_CLICK_ID,
+                    *LEFT_TRIGGER_VALUE_ID,
+                    *LEFT_TRIGGER_TOUCH_ID,
+                    *LEFT_TRACKPAD_X_ID,
+                    *LEFT_TRACKPAD_Y_ID,
+                    *LEFT_TRACKPAD_CLICK_ID,
+                    *LEFT_TRACKPAD_TOUCH_ID,
+                    *RIGHT_SYSTEM_CLICK_ID,
+                    *RIGHT_MENU_CLICK_ID,
+                    *RIGHT_BACK_CLICK_ID,
+                    *RIGHT_TRIGGER_CLICK_ID,
+                    *RIGHT_TRIGGER_VALUE_ID,
+                    *RIGHT_TRIGGER_TOUCH_ID,
+                    *RIGHT_TRACKPAD_X_ID,
+                    *RIGHT_TRACKPAD_Y_ID,
+                    *RIGHT_TRACKPAD_CLICK_ID,
+                    *RIGHT_TRACKPAD_TOUCH_ID,
                 ]
                 .into_iter()
                 .collect(),

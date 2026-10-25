@@ -55,7 +55,8 @@ pub struct ParsedStreamConfig {
     pub interaction_sources: InteractionSourcesConfig,
     // Huawei VR Glass can run either in 6DoF (tracking kit connected) or in 3DoF (glasses IMU
     // only). The picture reaching the client does not change, only the amount of tracking data we
-    // are allowed to believe in.
+    // are allowed to believe in. In "Auto" mode only the server clamps the head pose: it receives
+    // the controller poses from this client and can apply the clamp after recentering.
     pub three_dof: Option<ThreeDofConfig>,
 }
 
@@ -91,7 +92,12 @@ impl ParsedStreamConfig {
             buffering_history_weight: config.settings.video.buffering_history_weight,
             decoder_options: config.settings.video.mediacodec_extra_options.clone(),
             interaction_sources: InteractionSourcesConfig::new(config),
-            three_dof: config.settings.headset.three_dof.as_option().cloned(),
+            three_dof: config
+                .settings
+                .headset
+                .three_dof
+                .forced_config()
+                .cloned(),
         }
     }
 }
@@ -144,6 +150,14 @@ impl StreamContext {
             .select_sources(&config.interaction_sources);
 
         let xr_exts = xr_session.instance().exts();
+
+        // One-shot trace: if the stream never renders, this tells us how far construction got.
+        if platform.is_huawei() {
+            alvr_common::info!(
+                "[HVR-DIAG] StreamContext::new: begin, view_resolution={:?}",
+                config.view_resolution
+            );
+        }
 
         if xr_exts.fb_display_refresh_rate.is_some() {
             xr_session
@@ -216,6 +230,12 @@ impl StreamContext {
         let swapchains = [left_swapchain, right_swapchain];
         let swapchain_textures = [left_textures, right_textures];
 
+        if platform.is_huawei() {
+            alvr_common::info!(
+                "[HVR-DIAG] StreamContext::new: swapchains ready (target={target_view_resolution:?}, format={format:?})"
+            );
+        }
+
         #[cfg(target_os = "android")]
         let renderer = if platform.is_huawei() {
             let _ = swapchain_textures;
@@ -259,6 +279,10 @@ impl StreamContext {
             config.upscaling.clone(),
         ));
 
+        if platform.is_huawei() {
+            alvr_common::info!("[HVR-DIAG] StreamContext::new: renderer ready");
+        }
+
         core_ctx.send_active_interaction_profile(
             *HAND_LEFT_ID,
             interaction_ctx.read().hands_interaction[0].controllers_profile_id,
@@ -300,6 +324,10 @@ impl StreamContext {
         };
 
         this.update_reference_space();
+
+        if platform.is_huawei() {
+            alvr_common::info!("[HVR-DIAG] StreamContext::new: done");
+        }
 
         this
     }
@@ -559,26 +587,16 @@ impl StreamContext {
             StreamRendererBackend::Huawei(renderer) => {
                 for eye in 0..2 {
                     if eye == 0 && self.huawei_swapchain_trace.get() & 0x01 == 0 {
-                        alvr_common::info!("[HVR-DIAG] Huawei stream swapchain: before acquire");
+                        alvr_common::info!(
+                            "[HVR-DIAG] Huawei stream: drawing straight into the HVR surface, no swapchain"
+                        );
                         self.huawei_swapchain_trace
                             .set(self.huawei_swapchain_trace.get() | 0x01);
                     }
-                    self.swapchains[eye].acquire_image().unwrap();
-                    if eye == 0 && self.huawei_swapchain_trace.get() & 0x02 == 0 {
-                        alvr_common::info!("[HVR-DIAG] Huawei stream swapchain: after acquire");
-                        self.huawei_swapchain_trace
-                            .set(self.huawei_swapchain_trace.get() | 0x02);
-                    }
-                    self.swapchains[eye]
-                        .wait_image(xr::Duration::INFINITE)
-                        .unwrap();
-                    if eye == 0 && self.huawei_swapchain_trace.get() & 0x04 == 0 {
-                        alvr_common::info!("[HVR-DIAG] Huawei stream swapchain: after wait");
-                        self.huawei_swapchain_trace
-                            .set(self.huawei_swapchain_trace.get() | 0x04);
-                    }
+                    // No OpenXR swapchain on this platform: it has no working xrBeginFrame, so
+                    // xrAcquireSwapchainImage is rejected and the enumerated image handles are
+                    // zero. The renderer writes into the HVR surface the runtime handed us.
                     unsafe { renderer.render_view(buffer_ptr, eye) };
-                    self.swapchains[eye].release_image().unwrap();
                 }
             }
         }

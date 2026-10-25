@@ -70,6 +70,10 @@ try {
     if ($Configuration -eq 'Release') {
         $buildArguments += '--release'
     }
+    # GPL: bundle FFmpeg so the x264 software encoder is available. This machine (Steam Deck
+    # Windows, AMD Van Gogh) has no working hardware encoder, without it the streamer cannot
+    # start any encoder at all.
+    $buildArguments += '--gpl'
     if (-not $ResetConfiguration) {
         $buildArguments += '--keep-config'
     }

@@ -241,6 +241,26 @@ impl Lobby {
             .sync_actions(&[(&self.interaction_ctx.read().action_set).into()])
             .ok();
 
+        // Huawei: log every button transition locally, so the remote can be verified without a
+        // server connection (during streaming the same states are sent over the network instead).
+        if self.platform.is_huawei() {
+            interaction::log_huawei_button_changes(
+                &self.xr_session,
+                &self.interaction_ctx.read().button_actions,
+            );
+        }
+
+        #[cfg(target_os = "android")]
+        if self.platform.is_huawei() {
+            static LOBBY_TRACE: std::sync::atomic::AtomicU32 =
+                std::sync::atomic::AtomicU32::new(0);
+            let n = LOBBY_TRACE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
+            if n < 200 {
+                info!("[HVR-DIAG] lobby frame {n}: actions synced, reading hand data");
+            }
+        }
+
         // future_time doesn't have to be any particular value, just something after vsync_time
         let future_time = vsync_time + Duration::from_millis(80);
         let left_hand_data = interaction::get_hand_data(
@@ -348,13 +368,22 @@ impl Lobby {
             }
             #[cfg(target_os = "android")]
             LobbyRendererBackend::Huawei(renderer) => {
+                static LOBBY_RENDER_TRACE: std::sync::atomic::AtomicU32 =
+                    std::sync::atomic::AtomicU32::new(0);
+                let n = LOBBY_RENDER_TRACE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
+                // The Huawei runtime rejects every swapchain call: xrAcquireSwapchainImage needs a
+                // begun frame (this runtime has no working xrBeginFrame) and its enumerated image
+                // handles are all zero anyway. The renderer draws straight into the HVR surface
+                // instead, so simply render both eyes and let xrEndFrame carry no layers.
                 for eye in 0..2 {
-                    self.swapchains[eye].acquire_image().unwrap();
-                    self.swapchains[eye]
-                        .wait_image(xr::Duration::INFINITE)
-                        .unwrap();
+                    if n < 200 {
+                        info!("[HVR-DIAG] lobby frame {n}: render eye {eye}");
+                    }
                     renderer.render_view(eye);
-                    self.swapchains[eye].release_image().unwrap();
+                    if n < 200 {
+                        info!("[HVR-DIAG] lobby frame {n}: rendered eye {eye}");
+                    }
                 }
             }
         }

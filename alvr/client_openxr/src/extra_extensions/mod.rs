@@ -2,6 +2,9 @@ mod body_tracking_bd;
 mod body_tracking_fb;
 mod eye_gaze_interaction;
 mod eye_tracking_social;
+// The Huawei (and any Android) build links against the OpenXR headers vendored in
+// deps/openxrs-huawei, which predate XR_FB_face_tracking2, and the runtime does not expose it.
+#[cfg(not(target_os = "android"))]
 mod face_tracking2_fb;
 mod face_tracking_pico;
 mod facial_tracking_htc;
@@ -14,6 +17,7 @@ pub use body_tracking_bd::*;
 pub use body_tracking_fb::*;
 pub use eye_gaze_interaction::*;
 pub use eye_tracking_social::*;
+#[cfg(not(target_os = "android"))]
 pub use face_tracking2_fb::*;
 pub use face_tracking_pico::*;
 pub use facial_tracking_htc::*;

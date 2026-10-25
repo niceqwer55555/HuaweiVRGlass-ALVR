@@ -1,23 +1,73 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [ValidateSet('Debug', 'Release')]
     [string]$Configuration = 'Release',
-    [switch]$SkipToolInstall
+    [switch]$SkipToolInstall,
+    [string]$AndroidSdkRoot,
+    [string]$JavaHome
 )
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
+function Resolve-FirstExistingPath {
+    param([string[]]$Candidates)
+    foreach ($candidate in $Candidates) {
+        if (-not [string]::IsNullOrWhiteSpace($candidate) -and (Test-Path -LiteralPath $candidate -PathType Container)) {
+            return (Resolve-Path -LiteralPath $candidate).Path
+        }
+    }
+    return $null
+}
+
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $projectRoot = (Resolve-Path (Join-Path $repoRoot '..')).Path
-$androidSdk = 'C:\Users\LHT02\AppData\Local\Android\Sdk'
+
+# Allow overriding the toolchain location; otherwise probe the usual places on this machine.
+$resolvedAndroidSdk = Resolve-FirstExistingPath @(
+    $AndroidSdkRoot,
+    $env:ANDROID_HOME,
+    $env:ANDROID_SDK_ROOT,
+    'F:\AndroidSDK',
+    (Join-Path $env:LOCALAPPDATA 'Android\Sdk')
+)
+if (-not $resolvedAndroidSdk) {
+    throw "找不到 Android SDK；可用 -AndroidSdkRoot 指定，例如 .\build-android.ps1 -AndroidSdkRoot F:\AndroidSDK"
+}
+
+$androidSdk = $resolvedAndroidSdk
 $ndkRoot = Join-Path $androidSdk 'ndk\26.1.10909125'
-$javaHome = 'C:\Program Files\Microsoft\jdk-17.0.17.10-hotspot'
+if (-not (Test-Path -LiteralPath $ndkRoot -PathType Container)) {
+    $installedNdk = Get-ChildItem -LiteralPath (Join-Path $androidSdk 'ndk') -Directory -ErrorAction SilentlyContinue |
+        Sort-Object Name -Descending |
+        Select-Object -First 1
+    if ($installedNdk) {
+        $ndkRoot = $installedNdk.FullName
+    }
+}
+
+$resolvedJavaHome = Resolve-FirstExistingPath @(
+    $JavaHome,
+    $env:JAVA_HOME,
+    'F:\Download\jdk17\jdk-17.0.17+10',
+    (Get-ChildItem -LiteralPath 'F:\Download\jdk17' -Directory -ErrorAction SilentlyContinue |
+        Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName),
+    'C:\Program Files\Microsoft\jdk-17.0.17.10-hotspot'
+)
+
+if (-not $resolvedJavaHome) {
+    throw "找不到 JDK 17；可用 -JavaHome 指定，例如 .\build-android.ps1 -JavaHome F:\Download\jdk17\jdk-17.0.17+10"
+}
+$javaHome = $resolvedJavaHome
 
 foreach ($requiredPath in @($androidSdk, $ndkRoot, $javaHome)) {
     if (-not (Test-Path -LiteralPath $requiredPath -PathType Container)) {
         throw "缺少 Android 构建依赖：$requiredPath"
     }
 }
+
+Write-Host "Android SDK：$androidSdk"
+Write-Host "Android NDK：$ndkRoot"
+Write-Host "JDK：$javaHome"
 
 $env:ANDROID_HOME = $androidSdk
 $env:ANDROID_SDK_ROOT = $androidSdk

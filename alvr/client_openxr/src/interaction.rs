@@ -1,8 +1,11 @@
 use crate::extra_extensions::MotionTrackerBD;
+// FaceTracker2FB needs XR_FB_face_tracking2, which the Huawei OpenXR bindings do not provide.
+#[cfg(not(target_os = "android"))]
+use crate::extra_extensions::FaceTracker2FB;
 use crate::{
     extra_extensions::{
-        self, BodyJointSetBD, BodyTrackerBD, BodyTrackerFB, EyeTrackerSocial, FaceTracker2FB,
-        FaceTrackerPico, FacialTrackerHTC, MultimodalMeta, BODY_JOINT_LEFT_ELBOW_BD,
+        self, BodyJointSetBD, BodyTrackerBD, BodyTrackerFB, EyeTrackerSocial, FaceTrackerPico,
+        FacialTrackerHTC, MultimodalMeta, BODY_JOINT_LEFT_ELBOW_BD,
         BODY_JOINT_LEFT_FOOT_BD, BODY_JOINT_LEFT_KNEE_BD, BODY_JOINT_PELVIS_BD,
         BODY_JOINT_RIGHT_ELBOW_BD, BODY_JOINT_RIGHT_FOOT_BD, BODY_JOINT_RIGHT_KNEE_BD,
         BODY_JOINT_SET_FULL_BODY_META, BODY_JOINT_SPINE3_BD, FULL_BODY_JOINT_COUNT_META,
@@ -10,6 +13,7 @@ use crate::{
         FULL_BODY_JOINT_RIGHT_FOOT_BALL_META, FULL_BODY_JOINT_RIGHT_LOWER_LEG_META,
     },
     huawei_input, Platform,
+    huawei_session::HuaweiTrackingDegree,
 };
 use alvr_common::{
     glam::{Quat, Vec3},
@@ -127,6 +131,7 @@ pub struct HandInteraction {
 pub struct FaceSources {
     pub combined_eyes_source: Option<(xr::Action<xr::Posef>, xr::Space)>,
     pub eye_tracker_fb: Option<EyeTrackerSocial>,
+    #[cfg(not(target_os = "android"))]
     pub face_tracker_fb: Option<FaceTracker2FB>,
     pub eye_tracker_htc: Option<FacialTrackerHTC>,
     pub lip_tracker_htc: Option<FacialTrackerHTC>,
@@ -220,6 +225,42 @@ impl InteractionContext {
             xr::Binding::new(action, action.instance().string_to_path(path).unwrap())
         }
 
+        // The Huawei runtime may not expose every path we would like to bind, and a single
+        // unsupported path makes the whole suggestion fail. Registering each binding in a "core"
+        // and a "minimal" list too allows retrying with a smaller set.
+        fn push_huawei_binding<'a>(
+            enabled: bool,
+            priority: u8,
+            binding: xr::Binding<'a>,
+            all: &mut Vec<xr::Binding<'a>>,
+            core: &mut Vec<xr::Binding<'a>>,
+            minimal: &mut Vec<xr::Binding<'a>>,
+        ) {
+            if !enabled {
+                return;
+            }
+            all.push(binding);
+            match priority {
+                0 => {
+                    core.push(binding);
+                    minimal.push(binding);
+                }
+                1 => core.push(binding),
+                _ => (),
+            }
+        }
+
+        // Huawei VR Glass can run two different session types: 6DoF (with the visual tracking kit
+        // and its two tracked controllers) and 3DoF (glasses IMU only, driven by the small 3DoF
+        // remote). The session type is selected by the APK itself (see huawei_session), and the
+        // runtime only accepts bindings for the profile that matches it. Suggesting both crashes
+        // inside libvrsdk.so!hxrFindProfileForDevice while attaching the action sets, so decide
+        // here which single profile to use.
+        let huawei_tracking_degree = platform
+            .is_huawei()
+            .then(crate::huawei_session::detect_tracking_degree)
+            .flatten();
+
         let controllers_profile_path = match platform {
             p if p.is_quest() => QUEST_CONTROLLER_PROFILE_PATH, // todo: create new controller profile for quest pro and 3
             Platform::PicoG3 => PICO_G3_CONTROLLER_PROFILE_PATH,
@@ -231,13 +272,14 @@ impl InteractionContext {
             p if p.is_pico() => PICO4S_CONTROLLER_PROFILE_PATH,
             p if p.is_vive() => FOCUS3_CONTROLLER_PROFILE_PATH,
             p if p.is_yvr() => YVR_CONTROLLER_PROFILE_PATH,
-            Platform::HuaweiVrGlass => HUAWEI_CONTROLLER_PROFILE_PATH,
+            Platform::HuaweiVrGlass => match huawei_tracking_degree {
+                Some(HuaweiTrackingDegree::ThreeDof) => HUAWEI_3DOF_CONTROLLER_PROFILE_PATH,
+                // Unknown: keep binding the tracking kit profile, as before.
+                None | Some(HuaweiTrackingDegree::SixDof) => HUAWEI_CONTROLLER_PROFILE_PATH,
+            },
             _ => QUEST_CONTROLLER_PROFILE_PATH,
         };
         let controllers_profile_id = alvr_common::hash_string(controllers_profile_path);
-
-        // Create actions:
-
         let profile_button_set = &CONTROLLER_PROFILE_INFO
             .get(&controllers_profile_id)
             .unwrap()
@@ -424,6 +466,38 @@ impl InteractionContext {
 
         // Create action bindings:
 
+        // On Huawei, one unsupported path rejects the whole suggestion, so every binding is also
+        // recorded in a "core" and a "minimal" list: if the runtime refuses the full set, the
+        // profile is retried with the smaller ones instead of losing all input.
+        let mut bindings_core = vec![];
+        let mut bindings_minimal = vec![];
+
+        // Which buttons matter the most on Huawei, whatever the session type: trigger and home
+        // (system) are certain, the thumbstick/trackpad comes next, everything else is optional.
+        let huawei_binding_priority = |id: &u64| -> u8 {
+            if *id == *LEFT_TRIGGER_CLICK_ID
+                || *id == *RIGHT_TRIGGER_CLICK_ID
+                || *id == *LEFT_TRIGGER_VALUE_ID
+                || *id == *RIGHT_TRIGGER_VALUE_ID
+                || *id == *LEFT_SYSTEM_CLICK_ID
+                || *id == *RIGHT_SYSTEM_CLICK_ID
+            {
+                0
+            } else if *id == *LEFT_TRACKPAD_X_ID
+                || *id == *RIGHT_TRACKPAD_X_ID
+                || *id == *LEFT_TRACKPAD_Y_ID
+                || *id == *RIGHT_TRACKPAD_Y_ID
+                || *id == *LEFT_THUMBSTICK_X_ID
+                || *id == *RIGHT_THUMBSTICK_X_ID
+                || *id == *LEFT_THUMBSTICK_Y_ID
+                || *id == *RIGHT_THUMBSTICK_Y_ID
+            {
+                1
+            } else {
+                2 // menu / back / touch, drop these before anything else
+            }
+        };
+
         for (id, action) in &button_actions {
             let standard_path = BUTTON_INFO.get(id).unwrap().path;
             let path = if platform.is_huawei() {
@@ -433,12 +507,31 @@ impl InteractionContext {
             } else {
                 standard_path.to_owned()
             };
+            let priority = if platform.is_huawei() {
+                huawei_binding_priority(id)
+            } else {
+                u8::MAX
+            };
             match action {
                 ButtonAction::Binary { action, .. } => {
-                    bindings.push(binding(action, &path));
+                    push_huawei_binding(
+                        platform.is_huawei(),
+                        priority,
+                        binding(action, &path),
+                        &mut bindings,
+                        &mut bindings_core,
+                        &mut bindings_minimal,
+                    );
                 }
                 ButtonAction::Scalar { action, .. } => {
-                    bindings.push(binding(action, &path));
+                    push_huawei_binding(
+                        platform.is_huawei(),
+                        priority,
+                        binding(action, &path),
+                        &mut bindings,
+                        &mut bindings_core,
+                        &mut bindings_minimal,
+                    );
                 }
             }
         }
@@ -453,9 +546,12 @@ impl InteractionContext {
         } else {
             "/user/hand/right/input/grip/pose"
         };
+        // Poses and haptics belong to every hand based profile, but they are kept apart from the
+        // button bindings so a Huawei profile can be retried without them.
+        let mut bindings_pose = vec![];
         if platform.is_huawei() {
-            bindings.push(binding(&left_grip_action, left_tracking_pose_path));
-            bindings.push(binding(&right_grip_action, right_tracking_pose_path));
+            bindings_pose.push(binding(&left_grip_action, left_tracking_pose_path));
+            bindings_pose.push(binding(&right_grip_action, right_tracking_pose_path));
         } else {
             bindings.push(binding(&left_grip_action, left_tracking_pose_path));
             bindings.push(binding(&right_grip_action, right_tracking_pose_path));
@@ -478,6 +574,16 @@ impl InteractionContext {
             },
             "/user/hand/right/output/haptic",
         ));
+        if platform.is_huawei() {
+            bindings_pose.push(binding(
+                &left_vibration_action,
+                "/user/hand/left/output/haptic",
+            ));
+            bindings_pose.push(binding(
+                &left_vibration_action,
+                "/user/hand/right/output/haptic",
+            ));
+        }
 
         let multimodal_handle = create_ext_object("MultimodalMeta", Some(true), || {
             MultimodalMeta::new(xr_session.clone(), &extra_extensions, xr_system)
@@ -516,14 +622,72 @@ impl InteractionContext {
         }
 
         // Apply bindings:
-        xr_instance
-            .suggest_interaction_profile_bindings(
-                xr_instance
-                    .string_to_path(controllers_profile_path)
-                    .unwrap(),
-                &bindings,
-            )
-            .unwrap();
+        if platform.is_huawei() {
+            // Only ever bind the profile matching the session the runtime started. Suggesting a
+            // second one crashes inside libvrsdk.so!hxrFindProfileForDevice while the action sets
+            // are attached. Every path of a suggestion must be supported, otherwise the runtime
+            // rejects the whole profile, so walk from the richest set down to the bare minimum.
+            let profile_path = xr_instance.string_to_path(controllers_profile_path).unwrap();
+            let attempts: [(usize, Vec<xr::Binding>); 4] = [
+                (
+                    bindings.len() + bindings_pose.len(),
+                    bindings
+                        .iter()
+                        .copied()
+                        .chain(bindings_pose.iter().copied())
+                        .collect(),
+                ),
+                (
+                    bindings_core.len() + bindings_pose.len(),
+                    bindings_core
+                        .iter()
+                        .copied()
+                        .chain(bindings_pose.iter().copied())
+                        .collect(),
+                ),
+                (
+                    bindings_minimal.len() + bindings_pose.len(),
+                    bindings_minimal
+                        .iter()
+                        .copied()
+                        .chain(bindings_pose.iter().copied())
+                        .collect(),
+                ),
+                (bindings_minimal.len(), bindings_minimal.clone()),
+            ];
+            let mut accepted = false;
+            for (attempt_index, (binding_count, bindings)) in attempts.into_iter().enumerate() {
+                if binding_count == 0 {
+                    continue;
+                }
+                match xr_instance.suggest_interaction_profile_bindings(profile_path, &bindings) {
+                    Ok(()) => {
+                        accepted = true;
+                        info!(
+                            "Huawei {controllers_profile_path} bound ({huawei_tracking_degree:?}, attempt {attempt_index}, {binding_count} bindings)."
+                        );
+                        break;
+                    }
+                    Err(e) => warn!(
+                        "Huawei {controllers_profile_path} attempt {attempt_index} rejected ({e:?})."
+                    ),
+                }
+            }
+            if !accepted {
+                warn!(
+                    "Huawei {controllers_profile_path} could not be bound: no controller input will reach SteamVR."
+                );
+            }
+        } else {
+            xr_instance
+                .suggest_interaction_profile_bindings(
+                    xr_instance
+                        .string_to_path(controllers_profile_path)
+                        .unwrap(),
+                    &bindings,
+                )
+                .unwrap();
+        }
 
         // Pico headsets require calling get_system_properties to test for extensions, because all
         // extensions function pointers are available even if the feature is not supported by the
@@ -566,6 +730,27 @@ impl InteractionContext {
         };
 
         xr_session.attach_action_sets(&[&action_set]).unwrap();
+
+        // Diagnostic only: the runtime reports which profile it actually selected. Comparing it
+        // with the one bound above tells whether the session degree was guessed correctly.
+        if platform.is_huawei() {
+            for (name, path) in [("left", left_hand_path), ("right", right_hand_path)] {
+                match xr_session.current_interaction_profile(path) {
+                    Ok(profile) if profile == xr::Path::NULL => warn!(
+                        "[HVR-DIAG] Huawei runtime reports no interaction profile for the {name} hand."
+                    ),
+                    Ok(profile) => info!(
+                        "[HVR-DIAG] Huawei runtime active profile for the {name} hand: {} (bound: {controllers_profile_path}).",
+                        xr_instance
+                            .path_to_string(profile)
+                            .unwrap_or_else(|_| "<unknown>".into())
+                    ),
+                    Err(e) => {
+                        warn!("[HVR-DIAG] Huawei active profile query failed for the {name} hand: {e:?}")
+                    }
+                }
+            }
+        }
 
         let left_grip_space = left_grip_action
             .create_space(
@@ -681,6 +866,7 @@ impl InteractionContext {
             face_sources: FaceSources {
                 combined_eyes_source,
                 eye_tracker_fb: None,
+                #[cfg(not(target_os = "android"))]
                 face_tracker_fb: None,
                 eye_tracker_htc,
                 lip_tracker_htc,
@@ -704,7 +890,10 @@ impl InteractionContext {
         }
         self.multimodal_hands_enabled = false;
         self.face_sources.eye_tracker_fb = None;
-        self.face_sources.face_tracker_fb = None;
+        #[cfg(not(target_os = "android"))]
+        {
+            self.face_sources.face_tracker_fb = None;
+        }
         self.face_sources.face_tracker_pico = None;
         self.body_sources.body_tracker_fb = None;
         self.body_sources.body_tracker_bd = None;
@@ -758,11 +947,15 @@ impl InteractionContext {
             || EyeTrackerSocial::new(&self.xr_session),
         );
 
-        self.face_sources.face_tracker_fb = create_ext_object(
-            "FaceTracker2FB",
-            config.face_tracking.as_ref().map(|s| s.face_tracking_fb),
-            || FaceTracker2FB::new(self.xr_session.clone(), true, true),
-        );
+        // XR_FB_face_tracking2 is unavailable on the Huawei runtime, see extra_extensions.
+        #[cfg(not(target_os = "android"))]
+        {
+            self.face_sources.face_tracker_fb = create_ext_object(
+                "FaceTracker2FB",
+                config.face_tracking.as_ref().map(|s| s.face_tracking_fb),
+                || FaceTracker2FB::new(self.xr_session.clone(), true, true),
+            );
+        }
 
         self.face_sources.face_tracker_pico = create_ext_object(
             "FaceTrackerPico",
@@ -1230,6 +1423,48 @@ pub fn update_buttons(
     button_entries
 }
 
+// Diagnostic helper: the Huawei remote can only be verified locally, so mirror every button
+// transition into logcat. Requires xrSyncActions to have been called for the current frame.
+pub fn log_huawei_button_changes(
+    xr_session: &xr::Session<xr::OpenGlEs>,
+    button_actions: &HashMap<u64, ButtonAction>,
+) {
+    for (id, action) in button_actions {
+        let Some(button_info) = BUTTON_INFO.get(id) else {
+            continue;
+        };
+
+        match action {
+            ButtonAction::Binary {
+                action,
+                subaction_path,
+            } => {
+                if let Ok(state) = action.state(xr_session, *subaction_path) {
+                    if state.changed_since_last_sync {
+                        info!(
+                            "[HVR-INPUT] {} = {}",
+                            button_info.path, state.current_state
+                        );
+                    }
+                }
+            }
+            ButtonAction::Scalar {
+                action,
+                subaction_path,
+            } => {
+                if let Ok(state) = action.state(xr_session, *subaction_path) {
+                    if state.changed_since_last_sync {
+                        info!(
+                            "[HVR-INPUT] {} = {:.3}",
+                            button_info.path, state.current_state
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
 fn append_huawei_thumbstick_entries(
     xr_session: &xr::Session<xr::OpenGlEs>,
     button_actions: &HashMap<u64, ButtonAction>,
@@ -1320,13 +1555,23 @@ pub fn get_eye_gazes(
 }
 
 pub fn get_fb_face_expression(context: &FaceSources, time: Duration) -> Option<Vec<f32>> {
-    let xr_time = crate::to_xr_time(time);
+    #[cfg(target_os = "android")]
+    {
+        // XR_FB_face_tracking2 is unavailable on the Huawei runtime.
+        let _ = (context, time);
+        None
+    }
 
-    context
-        .face_tracker_fb
-        .as_ref()
-        .and_then(|t| t.get_face_expression_weights(xr_time).ok().flatten())
-        .map(|weights| weights.into_iter().collect())
+    #[cfg(not(target_os = "android"))]
+    {
+        let xr_time = crate::to_xr_time(time);
+
+        context
+            .face_tracker_fb
+            .as_ref()
+            .and_then(|t| t.get_face_expression_weights(xr_time).ok().flatten())
+            .map(|weights| weights.into_iter().collect())
+    }
 }
 
 pub fn get_pico_face_expression(context: &FaceSources, time: Duration) -> Option<Vec<f32>> {
