@@ -41,19 +41,26 @@ $settingsFile = Join-Path $configDir 'steamvr.vrsettings'
 
 # ---------------------------------------------------------- 1. the glasses
 Section '1. Glasses visible to Windows'
+# The HUAWEI VR Glass is a split design: the headset is just a DisplayPort
+# panel. It does NOT show up as an HMD/HID device - it shows up as a MONITOR.
+# So the check is: did the monitor count go up after plugging it in?
 $hwDev = Get-CimInstance Win32_PnPEntity -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -match 'Huawei|HUAWEI|VR Glass|VRGlass|Ceres|HMD' }
+    Where-Object { $_.Name -match 'Huawei|HUAWEI|VR Glass|VRGlass|Ceres' }
 if ($hwDev) {
     foreach ($d in $hwDev) { Good "$($d.Name)  [Status=$($d.Status)]"; Info $d.DeviceID }
 } else {
-    Bad 'no Huawei/HMD PnP device found'
-    Info 'Is the official USB-C cable actually plugged into this PC?'
-    Info 'The assistant installs the USB driver on first run - see item 2.'
+    Info 'no Huawei HID device - that is normal for this headset (display only)'
 }
 
-$monitors = Get-CimInstance -Namespace root\wmi -ClassName WmiMonitorBasicDisplayParams -ErrorAction SilentlyContinue
-if ($monitors) {
-    foreach ($m in $monitors) { Info "monitor EDID: $($m.InstanceName)" }
+$monitors = @(Get-CimInstance -Namespace root\wmi -ClassName WmiMonitorBasicDisplayParams -ErrorAction SilentlyContinue)
+Write-Host ("         monitors currently attached: {0}" -f $monitors.Count) -ForegroundColor Gray
+foreach ($m in $monitors) { Info "EDID: $($m.InstanceName)" }
+if ($monitors.Count -ge 2) {
+    Good 'more than one monitor - the glasses are probably among them'
+    Info 'Compare this list before/after plugging the cable to identify it.'
+} else {
+    Bad 'only one monitor - the glasses are not getting a DP signal'
+    Info 'Re-seat the USB-C cable; the port must support DP alt-mode.'
 }
 
 # --------------------------------------------------------- 2. the assistant

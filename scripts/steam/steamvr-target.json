@@ -1,0 +1,4 @@
+{
+  "_comment": "Which SteamVR install vr_app.py manages. Game manifests are written into <steamvrRoot>\\apps and registered with <steamvrRoot>\\bin\\win64\\vrcmd.exe, so the Steam client and its config are never touched.",
+  "steamvrRoot": "F:\\PY\\SteamVR2.18.4\\SteamVR"
+}
