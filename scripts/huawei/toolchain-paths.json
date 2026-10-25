@@ -1,0 +1,12 @@
+{
+  "_comment": "Optional overrides for toolchain-env.ps1. Empty values are ignored; a missing file is ignored too. Environment variables (TOOLS_ROOT, CARGO_HOME, RUSTUP_HOME, VC_TOOLS_ROOT, WIN_SDK_ROOT, LIBCLANG_PATH, ANDROID_HOME, ANDROID_NDK_HOME, JAVA_HOME) and script parameters still win over this file.",
+  "toolsRoot": "F:\\Tools",
+  "cargoHome": "",
+  "rustupHome": "",
+  "vcToolsRoot": "",
+  "winSdkRoot": "",
+  "libclangPath": "",
+  "androidHome": "",
+  "androidNdkHome": "",
+  "javaHome": ""
+}

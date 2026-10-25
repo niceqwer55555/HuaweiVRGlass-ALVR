@@ -27,7 +27,8 @@
 2. 用 `--features gpl` 重新编译 `alvr_server_openvr`，把 `VideoEncoderSW`（FFmpeg `libx264`，`preset=ultrafast`、`tune=zerolatency`）编进驱动 DLL。
 3. 构建脚本：`scripts/huawei/build-driver-gpl.ps1`
    - 不调用 `VsDevCmd.bat`（它会触发 `reg.exe`，被安全策略拦），改为手工设置 `INCLUDE` / `LIB` / `CC`
-   - `CARGO_HOME` 指向 `D:\PY\1\toolchain-setup\cargo`，离线编译
+   - 工具链路径由 `scripts/huawei/toolchain-env.ps1` 运行时探测，默认根目录 `D:\Tools`
+     （`CARGO_HOME=D:\Tools\rust\cargo`、`RUSTUP_HOME=D:\Tools\rust\rustup`），离线编译
    - 产物落到 `build/gpl_driver_stage/`
 4. 配置脚本：`scripts/huawei/apply-software-encoding.ps1`（通过 dashboard HTTP API 下发参数）
 

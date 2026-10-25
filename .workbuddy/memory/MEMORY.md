@@ -7,15 +7,29 @@
 - 手动路径持久化机制：dashboard 启动时 `steamvr_launcher::load_persisted_steamvr_path()` 读取 exe 同目录的 `steamvr_path.txt`（首行纯文本，无引号），UI 里点「应用」也会回写该文件
 - 约定：用户提到「上次设置的 SteamVR 路径」即指上面这条，无需再问
 
-## 构建/工具链
-- 详见 2026-10-24 日志：Rust 在 `D:/PY/1/toolchain-setup/rust-toolchain`，VS BuildTools 在 `F:/VS2022/BuildTools`，LLVM 在 `F:/LLVM`，SDK 在 C 盘
+## 构建/工具链（2026-10-25 起统一到 `F:\Tools`，旧路径全部作废）
+- **当前使用 `F:\Tools`**（`D:\Tools` 是同一份环境的另一盘镜像，两者内容一致，可随时切）。
+  旧路径 `D:/PY/1/toolchain-setup`、`F:/VS2022/BuildTools`、`F:/LLVM`、`F:/AndroidSDK` 已作废；
+  JDK 仍在 `F:\Download\jdk17\jdk-17.0.17+10`
+- 布局：`rust\{cargo,rustup}`、`msvc\VC\Tools\MSVC\14.44.35207`、`Windows Kits\10`[10.0.26100.0]、
+  `LLVM\18.1.8\bin`(libclang)、`AndroidSDK`(ndk 26.1.10909125 / build-tools 34.0.0 / platform android-30)、
+  `git`、`nodejs`、`python\{3.9,3.10,3.12}`、`go`、`mingw64`
+- 切盘只需改 `scripts/huawei/toolchain-paths.json` 的 `toolsRoot`（脚本默认候选顺序 F → D → C）
+- 编译必须成对设置 `CARGO_HOME=D:\Tools\rust\cargo` + `RUSTUP_HOME=D:\Tools\rust\rustup`
+- **所有构建脚本不再硬编码路径**：统一 dot-source `scripts/huawei/toolchain-env.ps1`，
+  调 `Get-VrToolchain -Validate [-RequireAndroid]` 再 `$tc.Apply()`（自动注入 INCLUDE/LIB/CC/PATH/CARGO_HOME/
+  RUSTUP_HOME/LIBCLANG_PATH）。覆盖优先级：参数 > 环境变量 > `scripts/huawei/toolchain-paths.json` > 默认候选
+  （`D:\Tools` → `F:\Tools` → `C:\Tools`，认 `rust\` 子目录为标记）
+- **不要调用 `VsDevCmd.bat`**（内部走 `reg.exe`，被安全策略拦）；也**不要用 `Remove-Item Env:XXX`**，
+  safe-delete 钩子在变量不存在时 fail-closed 直接抛异常 → 用
+  `[Environment]::SetEnvironmentVariable('X',$null,'Process')`
 - 产物输出目录：`D:/PY/1/artifacts/`
 
 ## Android 构建环境（本机，2026-10-24 搭起）
-- Android SDK root：`F:\AndroidSDK`（platform-tools / platforms;android-30 / build-tools;34.0.0 / ndk;26.1.10909125）
-- JDK 17：`F:\Download\jdk17\jdk-17.0.17+10`
-- rust target std 是手工装的：`D:\PY\1\toolchain-setup\rust-toolchain\lib\rustlib\armv7-linux-androideabi`（须与 rustc 1.99.1 commit 58cf8f9c3 同源：dist/2026-10-15/rust-std-1.99.1-*.tar.xz）
-- linker/ar 配置写在 `D:\PY\1\toolchain-setup\cargo\config.toml` 的 `[target.armv7-linux-androideabi]`
+- Android SDK root：`D:\Tools\AndroidSDK`（platform-tools / platforms;android-30 / build-tools;34.0.0 / ndk;26.1.10909125）
+- JDK 17：`F:\Download\jdk17\jdk-17.0.17+10`（D:\Tools 下没有 JDK，模块里保留了这条兜底）
+- rust target std 是手工装的（须与 rustc 1.99.1 commit 58cf8f9c3 同源：dist/2026-10-15/rust-std-1.99.1-*.tar.xz）
+- linker/ar 配置写在 `D:\Tools\rust\cargo\config.toml` 的 `[target.armv7-linux-androideabi]`
 - 交叉编译命令：`cargo build -p alvr_client_openxr --target armv7-linux-androideabi --release`（需 ANDROID_NDK_HOME + CC 指向 NDK clang 包装器）
 - sdkmanager 在非交互 host 会挂住，调用时必须用管道输入 "y"
 
@@ -82,6 +96,44 @@
 - runtime 只注册两个：`/interaction_profiles/huawei/controller`（3DoF 遥控器/手机）与 `/interaction_profiles/huawei/6dof_controller`
 - inputs.rs 里 `interaction_profile!` 宏会拼出 `<vendor>/<name>_controller`，3DoF 那条必须手写常量
 - 建议绑定若含 runtime 不支持的路径，整次 suggest 会失败 -> interaction.rs 有 full/core/minimal 降级阶梯
+
+## 【有线 USB 串流】ALVR 原生支持，但有两个配置必须手改
+- 机制：`alvr/adb/src/lib.rs` `WiredConnection::setup()` 用 `adb forward` 转发
+  **9943（CONTROL_PORT）+ 9944（stream_port）**；客户端经 forward 后 = 127.0.0.1，
+  `server_core/src/connection.rs:802` 据此判 `wired = true`
+- 触发：Dashboard 设备页打开「Wired client」开关（client_list 里出现 `client.wired` 条目）
+- **坑 1（必改）**：`connection.wired_client_type` 默认 `{Custom:"alvr.client",variant:"Store"}`，
+  `get_process_name()` 只认官方包名 → 必须改成
+  `{Custom:"com.lht.huaweivr.alvr",variant:"Custom"}`，否则永远
+  `NotReady("No suitable ALVR client is installed")`
+- **坑 2（必改）**：`connection.wired_client_autolaunch` 必须设 **false** —— ALVR 用
+  `monkey -p <pkg> 1` 拉起应用，不带 action，华为客户端进不了 VR。改为手动：
+  `adb shell am start -a com.huawei.android.vr.action.MAIN -n com.lht.huaweivr.alvr/.HuaweiVrActivity`
+  （且必须保持 resumed，`WiredConnection` 才会返回 Ready）
+- adb 必须放在 **`bin/platform-tools/adb.exe`**（`layout.executables_dir` 默认是 `bin`）；
+  根目录那份 `platform-tools/` 不算，匹配不上 ALVR 会去 dl.google.com 现下载
+- **拓扑互斥**：官方 PC 驱动 = 眼镜 USB-C 直插 PC（DP alt-mode 原生直出，不过 ALVR 编码）；
+  ALVR = 眼镜插手机，PC↔手机 才是串流段。眼镜只有一个 USB-C 口 → **物理上不可能并存**
+- **【切换官方有线 vs ALVR 的正确做法】不要动 vrpathreg，改 `driver_<name>.enable`**
+  - 文件：`D:\Program Files\Steam\config\steamvr.vrsettings`（从 `openvrpaths.vrpath` 的 `config[0]` 取）
+    ```
+    "driver_alvr_server" : { "enable" : true }
+    "driver_huaweiVR"    : { "enable" : false }
+    ```
+  - 这是 SteamVR 官方 per-driver 开关，**ALVR 源码里没有任何写 enable 的逻辑**（不会被抢回），
+    比 `vrpathreg removedriver` 安全（不改注册表路径、可随时切回）
+  - 必须**先停 SteamVR 再改**（vrserver 退出时会覆写 vrsettings），改完重启才生效
+  - 工具：`scripts/huawei/switch-vr-driver.ps1` → `status` / `huawei` / `alvr` / `-Dedupe`
+- **【自动版】`scripts/huawei/auto-vr-mode.ps1`：默认官方有线，手机插 USB 才切 ALVR**
+  - 判据：`adb devices -l` 里带 `usb:` 的行。**WiFi 的 `ip:5555` 不算**、`unauthorized` 不算（只告警）
+  - `-Status` 只报告 / `-Launch` 切换后拉起对应栈 / `-Watch` 常驻轮询插拔 / `-AdbPath` / `-Interval`
+  - 底层仍调 `switch-vr-driver.ps1`，自己只负责检测和拉起
+- **三个驱动都叫 `huaweiVR` → enable 键同名共享，只能同开同关**，必须先去重：
+  - `HwVRGlassLite\steamVRDriver\huaweiVR` 的 dll 仅 **109 KB**，旁有 `_real.dll` 558 KB → **shim 包装层**
+  - `HwPCVR Assistant\...` 与 `Steam\common\HUAWEI VR Glass 6DoF Driver` 是 **同一份 558 KB**
+    （md5 `fa839ae25a3e685325b666aeea0f86d6`）→ 冗余重复注册
+  - 本机实测 `driver_huaweiVR.enable=false`、`LastKnown.ActualHMDDriver=alvr_server`
+    → 官方有线黑屏就是这个开关被关掉了
 - **绝不能同时建议两个 profile**：session attach 时会在 libvrsdk.so!hxrFindProfileForDevice 空指针崩溃（已 tombstone 证实）
 
 ## 会话自由度（3DoF vs 6DoF）判定与变体打包

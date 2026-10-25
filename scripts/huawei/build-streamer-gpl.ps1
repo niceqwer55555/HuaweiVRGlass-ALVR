@@ -5,55 +5,32 @@
 [CmdletBinding()]
 param(
     [ValidateSet('Debug', 'Release')]
-    [string]$Configuration = 'Release'
+    [string]$Configuration = 'Release',
+    [string]$ToolsRoot,
+    [switch]$Online
 )
 
 $ErrorActionPreference = 'Stop'
-$repoRoot = 'F:\PY\HuaweiVRGlass-ALVR'
-$vsDevCmd = 'F:\VS2022\BuildTools\Common7\Tools\VsDevCmd.bat'
-$libclangPath = 'F:\LLVM\bin'
-$cargoBin = 'D:\PY\1\toolchain-setup\rust-toolchain\bin'
+# Toolchain locations are resolved at runtime (default root: D:\Tools, see toolchain-env.ps1).
+# The MSVC environment is set manually instead of calling VsDevCmd.bat, which shells out to
+# reg.exe and is blocked in the build sandbox.
+. (Join-Path $PSScriptRoot 'toolchain-env.ps1')
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$tc = Get-VrToolchain -ToolsRoot $ToolsRoot -Validate
+$tc.Apply()
+if ($Online) { [Environment]::SetEnvironmentVariable('CARGO_NET_OFFLINE', $null, 'Process') }
+else { $env:CARGO_NET_OFFLINE = 'true' }
 $ffmpegDir = Join-Path $repoRoot 'deps\windows\ffmpeg'
 $logPath = Join-Path $repoRoot 'build\gpl-build.log'
 
-foreach ($p in @($vsDevCmd, (Join-Path $libclangPath 'libclang.dll'), (Join-Path $cargoBin 'cargo.exe'))) {
-    if (-not (Test-Path -LiteralPath $p)) { throw "missing prerequisite: $p" }
-}
 foreach ($p in @((Join-Path $ffmpegDir 'include\libavcodec\avcodec.h'), (Join-Path $ffmpegDir 'lib\avcodec.lib'))) {
     if (-not (Test-Path -LiteralPath $p)) { throw "FFmpeg dev files not found: $p" }
 }
 
-# Import the MSVC environment (cl.exe, INCLUDE, LIB, PATH)
-$vsEnvironment = & $env:ComSpec /d /s /c "`"$vsDevCmd`" -no_logo -arch=x64 -host_arch=x64 && set"
-foreach ($line in $vsEnvironment) {
-    if ($line -match '^([^=]+)=(.*)$') {
-        [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process')
-    }
-}
-$env:LIBCLANG_PATH = $libclangPath
-$env:PATH = "$cargoBin;$env:PATH"
-$env:CARGO_TERM_COLOR = 'never'
-
-# Windows SDK is installed separately; make sure its include/lib dirs are present
-$winSdkRoot = 'C:\Program Files (x86)\Windows Kits\10'
-if (Test-Path -LiteralPath (Join-Path $winSdkRoot 'Include')) {
-    $winSdkVersion = Get-ChildItem -LiteralPath (Join-Path $winSdkRoot 'Include') -Directory |
-        Where-Object { $_.Name -match '^\d' } |
-        Sort-Object Name -Descending |
-        Select-Object -First 1 -ExpandProperty Name
-    if ($env:INCLUDE -notlike "*Windows Kits*") {
-        $sdkInclude = @('ucrt', 'um', 'shared', 'winrt', 'cppwinrt') | ForEach-Object {
-            Join-Path (Join-Path (Join-Path $winSdkRoot 'Include') $winSdkVersion) $_
-        }
-        $env:INCLUDE = (@($env:INCLUDE) + $sdkInclude) -join ';'
-    }
-    if ($env:LIB -notlike "*Windows Kits*") {
-        $sdkLib = @('ucrt\x64', 'um\x64') | ForEach-Object {
-            Join-Path (Join-Path (Join-Path $winSdkRoot 'Lib') $winSdkVersion) $_
-        }
-        $env:LIB = (@($env:LIB) + $sdkLib) -join ';'
-    }
-}
+Write-Host ($tc.Summary())
+Write-Host "INCLUDE = $env:INCLUDE"
+Write-Host "LIB     = $env:LIB"
+Write-Host "cargo   = $($tc.CargoExe)"
 
 Push-Location $repoRoot
 try {
@@ -61,7 +38,12 @@ try {
     if ($Configuration -eq 'Release') { $arguments += '--release' }
     $arguments += @('--gpl', '--keep-config')
     Write-Host ("cargo " + ($arguments -join ' '))
-    & cargo @arguments 2>&1 | Tee-Object -FilePath $logPath
+    # cargo writes its progress to stderr; merging it into the pipeline under
+    # $ErrorActionPreference='Stop' would abort the build immediately.
+    $previousEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    & $tc.CargoExe @arguments 2>&1 | Tee-Object -FilePath $logPath
+    $ErrorActionPreference = $previousEap
     if ($LASTEXITCODE -ne 0) { throw "cargo xtask build-streamer --gpl failed with exit code $LASTEXITCODE" }
 
     $driverDir = Join-Path $repoRoot 'build\alvr_streamer_windows\bin\win64'

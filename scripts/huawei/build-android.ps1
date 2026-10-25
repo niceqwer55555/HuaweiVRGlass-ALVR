@@ -4,7 +4,8 @@ param(
     [string]$Configuration = 'Release',
     [switch]$SkipToolInstall,
     [string]$AndroidSdkRoot,
-    [string]$JavaHome
+    [string]$JavaHome,
+    [string]$ToolsRoot
 )
 
 $ErrorActionPreference = 'Stop'
@@ -22,52 +23,17 @@ function Resolve-FirstExistingPath {
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $projectRoot = (Resolve-Path (Join-Path $repoRoot '..')).Path
 
-# Allow overriding the toolchain location; otherwise probe the usual places on this machine.
-$resolvedAndroidSdk = Resolve-FirstExistingPath @(
-    $AndroidSdkRoot,
-    $env:ANDROID_HOME,
-    $env:ANDROID_SDK_ROOT,
-    'F:\AndroidSDK',
-    (Join-Path $env:LOCALAPPDATA 'Android\Sdk')
-)
-if (-not $resolvedAndroidSdk) {
-    throw "找不到 Android SDK；可用 -AndroidSdkRoot 指定，例如 .\build-android.ps1 -AndroidSdkRoot F:\AndroidSDK"
-}
+# 工具链位置统一由 toolchain-env.ps1 运行时探测（默认根目录 D:\Tools）。
+# -AndroidSdkRoot / -JavaHome 仍然优先，仅作为覆盖写入环境变量。
+. (Join-Path $PSScriptRoot 'toolchain-env.ps1')
+if ($AndroidSdkRoot) { $env:ANDROID_HOME = $AndroidSdkRoot }
+if ($JavaHome) { $env:JAVA_HOME = $JavaHome }
+$tc = Get-VrToolchain -ToolsRoot $ToolsRoot -Validate -RequireAndroid
+$androidSdk = $tc.AndroidRoot
+$ndkRoot = $tc.AndroidNdk
+$javaHome = $tc.JavaHome
 
-$androidSdk = $resolvedAndroidSdk
-$ndkRoot = Join-Path $androidSdk 'ndk\26.1.10909125'
-if (-not (Test-Path -LiteralPath $ndkRoot -PathType Container)) {
-    $installedNdk = Get-ChildItem -LiteralPath (Join-Path $androidSdk 'ndk') -Directory -ErrorAction SilentlyContinue |
-        Sort-Object Name -Descending |
-        Select-Object -First 1
-    if ($installedNdk) {
-        $ndkRoot = $installedNdk.FullName
-    }
-}
-
-$resolvedJavaHome = Resolve-FirstExistingPath @(
-    $JavaHome,
-    $env:JAVA_HOME,
-    'F:\Download\jdk17\jdk-17.0.17+10',
-    (Get-ChildItem -LiteralPath 'F:\Download\jdk17' -Directory -ErrorAction SilentlyContinue |
-        Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName),
-    'C:\Program Files\Microsoft\jdk-17.0.17.10-hotspot'
-)
-
-if (-not $resolvedJavaHome) {
-    throw "找不到 JDK 17；可用 -JavaHome 指定，例如 .\build-android.ps1 -JavaHome F:\Download\jdk17\jdk-17.0.17+10"
-}
-$javaHome = $resolvedJavaHome
-
-foreach ($requiredPath in @($androidSdk, $ndkRoot, $javaHome)) {
-    if (-not (Test-Path -LiteralPath $requiredPath -PathType Container)) {
-        throw "缺少 Android 构建依赖：$requiredPath"
-    }
-}
-
-Write-Host "Android SDK：$androidSdk"
-Write-Host "Android NDK：$ndkRoot"
-Write-Host "JDK：$javaHome"
+Write-Host ($tc.Summary())
 
 $env:ANDROID_HOME = $androidSdk
 $env:ANDROID_SDK_ROOT = $androidSdk
@@ -93,7 +59,7 @@ try {
     if ($Configuration -eq 'Release') {
         $buildArguments += '--release'
     }
-    cargo @buildArguments
+    & $tc.CargoExe @buildArguments
 
     $sourceApk = Join-Path $repoRoot 'build\alvr_client_android\alvr_client_android.apk'
     if (-not (Test-Path -LiteralPath $sourceApk -PathType Leaf)) {

@@ -158,6 +158,63 @@ fn unblock_alvr_driver_within_vrsettings(text: &str) -> Result<String> {
     Ok(serde_json::to_string_pretty(&settings)?)
 }
 
+/// Huawei VR Glass: the glasses have a single USB-C port, so ALVR and the official
+/// wired driver can never work at the same time - whichever one SteamVR activates
+/// decides whether you get a picture at all.
+///
+/// Policy: default to the official wired driver. Only fall back to ALVR when a
+/// phone is actually attached over USB, because that is the only situation where
+/// the glasses are on the phone instead of on the PC.
+///
+/// SteamVR reads the enable flags while starting up, so this must run before it
+/// is launched.
+fn apply_auto_driver_selection() {
+    let adb_path = adb::get_adb_path(&crate::get_filesystem_layout());
+    let usb_serials = adb_path
+        .as_deref()
+        .and_then(|path| adb::list_usb_device_serials(path).ok())
+        .unwrap_or_default();
+    let usb_phone = !usb_serials.is_empty();
+
+    match alvr_server_io::apply_auto_driver_selection(usb_phone) {
+        Ok(Some(winner)) => {
+            debug!("Auto driver selection: using {winner} (phone on USB: {usb_phone})")
+        }
+        Ok(None) => debug!("Auto driver selection: skipped, no Huawei driver registered"),
+        Err(err) => warn!("Auto driver selection failed: {err:?}"),
+    }
+
+    if usb_phone {
+        if let Some(path) = adb_path.as_deref() {
+            launch_huawei_vr_client(path, &usb_serials);
+        }
+    }
+}
+
+/// The wired client cannot be started by ALVR's own autolaunch: it uses
+/// `monkey`, which opens the app without the VR action and the phone never
+/// enters VR mode. Start it ourselves with the right intent, otherwise the
+/// wired connection keeps reporting "No suitable ALVR client is installed".
+fn launch_huawei_vr_client(adb_path: &str, serials: &[String]) {
+    // Must match connection.wired_client_type in session.json.
+    const CLIENT_PACKAGE: &str = "com.lht.huaweivr.alvr";
+    const CLIENT_ACTIVITY: &str = ".HuaweiVrActivity";
+    const VR_MAIN_ACTION: &str = "com.huawei.android.vr.action.MAIN";
+
+    for serial in serials {
+        match adb::start_application_with_action(
+            adb_path,
+            serial,
+            CLIENT_PACKAGE,
+            CLIENT_ACTIVITY,
+            VR_MAIN_ACTION,
+        ) {
+            Ok(()) => debug!("Launched Huawei VR client on {serial}"),
+            Err(err) => warn!("Failed to launch Huawei VR client on {serial}: {err:?}"),
+        }
+    }
+}
+
 pub struct Launcher {
     _phantom: PhantomData<()>,
 }
@@ -196,6 +253,8 @@ impl Launcher {
         if let Err(err) = unblock_alvr_driver() {
             warn!("Failed to unblock ALVR driver: {:?}", err);
         }
+
+        apply_auto_driver_selection();
 
         #[cfg(target_os = "linux")]
         {

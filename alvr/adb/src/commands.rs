@@ -189,8 +189,64 @@ pub fn start_application(adb_path: &str, device_serial: &str, application_id: &s
     Ok(())
 }
 
+/// Launch an app through an explicit intent instead of `monkey`.
+///
+/// `monkey -p <pkg> 1` starts the default launcher activity, which is not enough
+/// for the Huawei VR client: the phone has to enter VR mode, and that only
+/// happens when the activity is started with the VR MAIN action.
+pub fn start_application_with_action(
+    adb_path: &str,
+    device_serial: &str,
+    package: &str,
+    activity: &str,
+    action: &str,
+) -> Result<()> {
+    get_command(
+        adb_path,
+        &[
+            "-s",
+            device_serial,
+            "shell",
+            "am",
+            "start",
+            "-a",
+            action,
+            "-n",
+            &format!("{package}/{activity}"),
+        ],
+    )
+    .output()
+    .context(format!("Failed to start {package} with action {action}"))?;
+
+    Ok(())
+}
+
 //////////
 // Devices
+
+/// Serial numbers of devices attached over USB and ready to be used.
+///
+/// Devices reachable only over WiFi are left out on purpose: their serial looks
+/// like "host:port", and a phone sitting on WiFi does not keep the glasses from
+/// being plugged straight into the PC, which is what official wired mode needs.
+/// Same for anything not fully authorized - ALVR could not drive it anyway.
+pub fn list_usb_device_serials(adb_path: &str) -> Result<Vec<String>> {
+    use crate::parse::ConnectionState;
+
+    let devices = list_devices(adb_path)?;
+
+    Ok(devices
+        .into_iter()
+        .filter(|device| {
+            matches!(device.connection_state, Some(ConnectionState::Device))
+                && device
+                    .serial
+                    .as_deref()
+                    .map_or(false, |serial| !serial.contains(':'))
+        })
+        .filter_map(|device| device.serial)
+        .collect())
+}
 
 pub fn list_devices(adb_path: &str) -> Result<Vec<Device>> {
     let output = get_command(adb_path, &["devices", "-l"])

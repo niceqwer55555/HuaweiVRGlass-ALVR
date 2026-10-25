@@ -7,7 +7,8 @@ param(
     [string]$JavaHome,
     [string]$Keystore,
     [string]$KeystoreAlias = 'androiddebugkey',
-    [string]$KeystorePassword = 'alvrclient'
+    [string]$KeystorePassword = 'alvrclient',
+    [string]$ToolsRoot
 )
 
 <#
@@ -62,31 +63,23 @@ function Replace-Bytes {
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 
-$androidSdk = Resolve-FirstExistingPath @(
-    $AndroidSdkRoot,
-    $env:ANDROID_HOME,
-    $env:ANDROID_SDK_ROOT,
-    'F:\AndroidSDK',
-    (Join-Path $env:LOCALAPPDATA 'Android\Sdk')
-)
-if (-not $androidSdk) { throw '找不到 Android SDK；请用 -AndroidSdkRoot 指定。' }
-
-$javaHome = Resolve-FirstExistingPath @(
-    $JavaHome,
-    $env:JAVA_HOME,
-    'F:\Download\jdk17\jdk-17.0.17+10',
-    (Get-ChildItem -LiteralPath 'F:\Download\jdk17' -Directory -ErrorAction SilentlyContinue |
-        Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName)
-)
-if (-not $javaHome) { throw '找不到 JDK 17；请用 -JavaHome 指定。' }
+# 工具链位置统一由 toolchain-env.ps1 运行时探测（默认根目录 D:\Tools）。
+. (Join-Path $PSScriptRoot 'toolchain-env.ps1')
+if ($AndroidSdkRoot) { $env:ANDROID_HOME = $AndroidSdkRoot }
+if ($JavaHome) { $env:JAVA_HOME = $JavaHome }
+$tc = Get-VrToolchain -ToolsRoot $ToolsRoot -RequireAndroid
+$androidSdk = $tc.AndroidRoot
+$javaHome = $tc.JavaHome
+# apksigner.bat / zipalign 依赖 JAVA_HOME，必须在调用前注入。
 $env:JAVA_HOME = $javaHome
 $env:Path = "$(Join-Path $javaHome 'bin');$env:Path"
 
-$buildTools = Join-Path $androidSdk 'build-tools'
-if (-not (Test-Path -LiteralPath $buildTools -PathType Container)) { throw "找不到 build-tools：$buildTools" }
-$buildToolsVersion = Get-ChildItem -LiteralPath $buildTools -Directory | Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
-$zipalign = Join-Path $buildToolsVersion 'zipalign.exe'
-$apksigner = Join-Path $buildToolsVersion 'apksigner.bat'
+$buildToolsVersion = $tc.BuildTools
+$zipalign = $tc.ZipalignExe
+$apksigner = $tc.Apksigner
+Write-Host "Android SDK：$androidSdk"
+Write-Host "build-tools：$buildToolsVersion"
+Write-Host "JDK：$javaHome"
 
 foreach ($requiredFile in @($NativeLibrary, $BaseApk)) {
     if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) { throw "缺少打包输入：$requiredFile" }

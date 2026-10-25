@@ -28,14 +28,13 @@ fn openvr_source_file_path() -> Result<PathBuf> {
 
 pub fn steamvr_settings_file_path() -> Result<PathBuf> {
     let path = if cfg!(windows) {
-        // N.B. if ever implementing this: given Steam can be installed on another
-        // drive, etc., this should probably start by looking at Windows registry keys.
-        bail!("Not implemented for Windows.") // Original motive for implementation had little reason for Windows.
+        // SteamVR records its config directory inside openvrpaths.vrpath, so reading
+        // it from there works no matter which drive Steam happens to live on.
+        get_single_openvr_path("config")?
     } else {
-        dirs::data_dir()
+        dirs::data_dir().to_any()?.join("Steam/config")
     }
-    .to_any()?
-    .join("Steam/config/steamvr.vrsettings");
+    .join("steamvr.vrsettings");
 
     if path.exists() {
         Ok(path)

@@ -5,7 +5,8 @@
 
 [CmdletBinding()]
 param(
-    [string]$StageDir = 'F:\PY\HuaweiVRGlass-ALVR\build\gpl_driver_stage',
+    [string]$StageDir,
+    [string]$ToolsRoot,
     [switch]$Clean,
     # Allow cargo to refresh the crate index. Needed when the local index cache loses an entry,
     # otherwise cargo fails with "no matching package named ..." even though the crate is cached.
@@ -13,24 +14,22 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$repoRoot = 'F:\PY\HuaweiVRGlass-ALVR'
-$msvcVer = '14.44.35207'
-$sdkVer = '10.0.26100.0'
-$vcRoot = "F:\VS2022\BuildTools\VC\Tools\MSVC\$msvcVer"
-$sdkRoot = 'C:\Program Files (x86)\Windows Kits\10'
-$libclangPath = 'F:\LLVM\bin'
-$cargoHome = 'D:\PY\1\toolchain-setup\cargo'
-$cargoBin = Join-Path $cargoHome 'bin'
-$rustBin = 'D:\PY\1\toolchain-setup\rust-toolchain\bin'
+# Toolchain locations are resolved at runtime (default root: D:\Tools, see toolchain-env.ps1).
+. (Join-Path $PSScriptRoot 'toolchain-env.ps1')
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+if (-not $StageDir) { $StageDir = Join-Path $repoRoot 'build\gpl_driver_stage' }
+$tc = Get-VrToolchain -ToolsRoot $ToolsRoot -Validate
+$tc.Apply()
+if ($Online) {
+    [Environment]::SetEnvironmentVariable('CARGO_NET_OFFLINE', $null, 'Process')
+    Write-Host 'online: cargo may refresh the crate index'
+} else {
+    $env:CARGO_NET_OFFLINE = 'true'
+}
 $ffmpegDir = Join-Path $repoRoot 'deps\windows\ffmpeg'
 $logPath = Join-Path $repoRoot 'build\gpl-driver-build.log'
 
 $checks = @(
-    (Join-Path $vcRoot 'bin\HostX64\x64\cl.exe'),
-    (Join-Path $vcRoot 'lib\x64'),
-    (Join-Path $sdkRoot "Include\$sdkVer\ucrt"),
-    (Join-Path $libclangPath 'libclang.dll'),
-    (Join-Path $rustBin 'cargo.exe'),
     (Join-Path $ffmpegDir 'include\libavcodec\avcodec.h'),
     (Join-Path $ffmpegDir 'lib\avcodec.lib')
 )
@@ -38,59 +37,23 @@ foreach ($p in $checks) {
     if (-not (Test-Path -LiteralPath $p)) { throw "missing prerequisite: $p" }
 }
 
-# --- MSVC / Windows SDK environment (manual, no VsDevCmd) ---
-$includeDirs = @(
-    (Join-Path $vcRoot 'include'),
-    (Join-Path 'F:\VS2022\BuildTools\VC\Auxiliary\VS' 'include'),
-    (Join-Path $sdkRoot "Include\$sdkVer\ucrt"),
-    (Join-Path $sdkRoot "Include\$sdkVer\um"),
-    (Join-Path $sdkRoot "Include\$sdkVer\shared"),
-    (Join-Path $sdkRoot "Include\$sdkVer\winrt"),
-    (Join-Path $sdkRoot "Include\$sdkVer\cppwinrt")
-)
-$libDirs = @(
-    (Join-Path $vcRoot 'lib\x64'),
-    (Join-Path $sdkRoot "Lib\$sdkVer\ucrt\x64"),
-    (Join-Path $sdkRoot "Lib\$sdkVer\um\x64")
-)
-$env:INCLUDE = ($includeDirs | Where-Object { Test-Path -LiteralPath $_ }) -join ';'
-$env:LIB = ($libDirs | Where-Object { Test-Path -LiteralPath $_ }) -join ';'
-$env:CC = Join-Path $vcRoot 'bin\HostX64\x64\cl.exe'
-$env:CXX = $env:CC
-$env:PATH = @(
-    (Join-Path $vcRoot 'bin\HostX64\x64'),
-    (Join-Path $sdkRoot "bin\$sdkVer\x64"),
-    $rustBin,
-    $cargoBin,
-    $env:PATH
-) -join ';'
-
-# --- Rust / cargo ---
-$env:CARGO_HOME = $cargoHome
-if ($Online) {
-    Remove-Item Env:CARGO_NET_OFFLINE -ErrorAction SilentlyContinue
-    Write-Host 'online: cargo may refresh the crate index'
-} else {
-    $env:CARGO_NET_OFFLINE = 'true'
-}
-$env:CARGO_TERM_COLOR = 'never'
-$env:LIBCLANG_PATH = $libclangPath
-
+Write-Host ($tc.Summary())
 Write-Host "INCLUDE = $env:INCLUDE"
 Write-Host "LIB     = $env:LIB"
 Write-Host "CC      = $env:CC"
+Write-Host "cargo   = $($tc.CargoExe)"
 
 Push-Location $repoRoot
 try {
     $previousEap = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     if ($Clean) {
-        & (Join-Path $rustBin 'cargo.exe') clean -p alvr_filesystem -p alvr_server_openvr 2>&1 |
+        & $tc.CargoExe clean -p alvr_filesystem -p alvr_server_openvr 2>&1 |
             Out-String | Write-Host
     }
     $cargoArgs = @('build', '--release', '-p', 'alvr_server_openvr', '--features', 'gpl')
     if (-not $Online) { $cargoArgs += '--offline' }
-    & (Join-Path $rustBin 'cargo.exe') @cargoArgs 2>&1 |
+    & $tc.CargoExe @cargoArgs 2>&1 |
         Tee-Object -FilePath $logPath
     $cargoExit = $LASTEXITCODE
     $ErrorActionPreference = $previousEap
