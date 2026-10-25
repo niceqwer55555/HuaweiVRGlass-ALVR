@@ -20,6 +20,12 @@
   调 `Get-VrToolchain -Validate [-RequireAndroid]` 再 `$tc.Apply()`（自动注入 INCLUDE/LIB/CC/PATH/CARGO_HOME/
   RUSTUP_HOME/LIBCLANG_PATH）。覆盖优先级：参数 > 环境变量 > `scripts/huawei/toolchain-paths.json` > 默认候选
   （`D:\Tools` → `F:\Tools` → `C:\Tools`，认 `rust\` 子目录为标记）
+- **release 构建必须换输出目录**：沙箱会拦 `target\release` 下的 file-write（报 os error 5 / LNK1104），
+  但 `target\debug`（cargo check）完全正常 → 加 `CARGO_TARGET_DIR=<repo>\build\target` 即可正常出 release 产物
+- **只要改的是 dashboard/server_io/adb，就只 `cargo build --release -p alvr_dashboard`**：
+  `alvr_server_openvr` 的 AMF C++（`cpp\shared\amf\public\common\*.cpp`）在沙箱里一定被拦，
+  而驱动源码没动时不需要重编它，DLL 沿用 `build\end\server\bin\win64\driver_alvr_server.dll`(08:35)
+- 打包服务端：`scripts/huawei/package-huawei-server.ps1`（模板=现役安装目录，只换 Dashboard，7-Zip 打 `build\end\server.7z`；`-Deploy` 回写安装目录）
 - **不要调用 `VsDevCmd.bat`**（内部走 `reg.exe`，被安全策略拦）；也**不要用 `Remove-Item Env:XXX`**，
   safe-delete 钩子在变量不存在时 fail-closed 直接抛异常 → 用
   `[Environment]::SetEnvironmentVariable('X',$null,'Process')`
