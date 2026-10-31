@@ -168,6 +168,24 @@ impl HuaweiEglContext {
             .get_proc_address(name)
             .map_or(ptr::null(), |function| function as *const c_void)
     }
+
+    /// Size of the HVR window surface, i.e. the largest rectangle fbo 0 can cover.
+    ///
+    /// The surface handed to the client is the phone screen (e.g. 1080x2265), which is *not* the
+    /// eye resolution requested by the server. Anything rendered outside this rectangle is clipped
+    /// away by the window system, so the direct-framebuffer renderers have to clamp their viewport
+    /// to it before copying the result into the eye textures.
+    pub fn surface_size(&self) -> (i32, i32) {
+        let width = self
+            .egl
+            .query_surface(self.display, self.surface, egl::WIDTH)
+            .unwrap_or(0);
+        let height = self
+            .egl
+            .query_surface(self.display, self.surface, egl::HEIGHT)
+            .unwrap_or(0);
+        (width, height)
+    }
 }
 
 type CreateImageFn = unsafe extern "C" fn(
@@ -370,6 +388,17 @@ impl GraphicsContext {
         if let Some(huawei_egl) = &self.huawei_egl {
             huawei_egl.swap_buffers();
         }
+    }
+
+    /// Size of the surface fbo 0 points at, or `(0, 0)` when it cannot be queried through EGL
+    /// (the non-Huawei paths render into textures and never need this).
+    pub fn surface_size(&self) -> (i32, i32) {
+        #[cfg(target_os = "android")]
+        if let Some(huawei_egl) = &self.huawei_egl {
+            return huawei_egl.surface_size();
+        }
+
+        (0, 0)
     }
 
     #[cfg(not(windows))]

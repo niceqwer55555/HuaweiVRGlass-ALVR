@@ -9,12 +9,95 @@ use glow::{self as gl, HasContext};
 use std::{
     cell::{Cell, RefCell},
     ffi::c_void,
+    num::NonZeroU32,
     rc::Rc,
 };
 
 struct HuaweiLobbyResources {
     program: gl::Program,
     texture: gl::Texture,
+}
+
+/// Copy the square region `(0, 0, src_side, src_side)` of the default framebuffer into an eye
+/// texture.
+///
+/// This is the piece the OpenXR runtime would normally do for us: Huawei's runtime binds the eye's
+/// framebuffer as fbo 0 at `xrAcquireSwapchainImage` time and copies it out on release. Our shim
+/// advertises real GL textures instead, but the renderers below still draw into fbo 0, so the
+/// content has to be pulled out by hand.
+///
+/// Two details matter:
+///   * it must run **before** `swap_huawei_buffers()` — a window surface back buffer is undefined
+///     after `eglSwapBuffers`, so anything copied afterwards is garbage;
+///   * both eyes cover the same rectangle, so eye 0's result is destroyed by eye 1's clear/draw.
+///     Copying right after each eye's draw call is what keeps the eyes apart.
+///
+/// FBOs are not shared between EGL contexts, so the scratch framebuffer is created lazily in
+/// whatever context is current and cached per renderer.
+unsafe fn blit_default_fbo_to_eye_texture(
+    gl: &gl::Context,
+    scratch_fbo: &Cell<Option<gl::Framebuffer>>,
+    dst_tex: gl::Texture,
+    dst_size: UVec2,
+    src_side: i32,
+) -> bool {
+    if src_side <= 0 || dst_size.x == 0 || dst_size.y == 0 {
+        return false;
+    }
+
+    let framebuffer = match scratch_fbo.get() {
+        Some(framebuffer) => framebuffer,
+        None => match gl.create_framebuffer() {
+            Ok(framebuffer) => {
+                scratch_fbo.set(Some(framebuffer));
+                framebuffer
+            }
+            Err(_) => return false,
+        },
+    };
+
+    gl.bind_framebuffer(gl::DRAW_FRAMEBUFFER, Some(framebuffer));
+    gl.framebuffer_texture_2d(
+        gl::DRAW_FRAMEBUFFER,
+        gl::COLOR_ATTACHMENT0,
+        gl::TEXTURE_2D,
+        Some(dst_tex),
+        0,
+    );
+    let complete = gl.check_framebuffer_status(gl::DRAW_FRAMEBUFFER) == gl::FRAMEBUFFER_COMPLETE;
+    gl.bind_framebuffer(gl::READ_FRAMEBUFFER, None);
+    if complete {
+        gl.blit_framebuffer(
+            0,
+            0,
+            src_side,
+            src_side,
+            0,
+            0,
+            dst_size.x as i32,
+            dst_size.y as i32,
+            gl::COLOR_BUFFER_BIT,
+            gl::LINEAR,
+        );
+    }
+    gl.bind_framebuffer(gl::FRAMEBUFFER, None);
+    gl.flush();
+
+    complete
+}
+
+/// The largest square that fits both the requested eye resolution and the fbo 0 surface.
+///
+/// The server may ask for e.g. 1600x1600 while the HVR window surface is only 1080x2265 wide; a
+/// viewport wider than the surface is silently clipped, which would leave part of the eye texture
+/// undefined.
+fn clamp_side(context: &GraphicsContext, view_resolution: UVec2) -> i32 {
+    let mut side = view_resolution.x.min(view_resolution.y) as i32;
+    let (surface_width, surface_height) = context.surface_size();
+    if surface_width > 0 && surface_height > 0 {
+        side = side.min(surface_width).min(surface_height);
+    }
+    side.max(1)
 }
 
 /// Renderer for Huawei's legacy OpenXR runtime.
@@ -29,6 +112,9 @@ pub struct HuaweiFramebufferRenderer {
     hud_message: RefCell<String>,
     hud_dirty: Cell<bool>,
     logged_eyes: Cell<u8>,
+    eye_textures: [Vec<u32>; 2],
+    scratch_fbos: [Cell<Option<gl::Framebuffer>>; 2],
+    logged_capture: Cell<u8>,
 }
 
 impl HuaweiFramebufferRenderer {
@@ -36,6 +122,7 @@ impl HuaweiFramebufferRenderer {
         context: Rc<GraphicsContext>,
         view_resolution: UVec2,
         initial_hud_message: &str,
+        eye_textures: [Vec<u32>; 2],
     ) -> Self {
         Self {
             context,
@@ -44,6 +131,9 @@ impl HuaweiFramebufferRenderer {
             hud_message: RefCell::new(initial_hud_message.to_owned()),
             hud_dirty: Cell::new(true),
             logged_eyes: Cell::new(0),
+            eye_textures,
+            scratch_fbos: [Cell::new(None), Cell::new(None)],
+            logged_capture: Cell::new(0),
         }
     }
 
@@ -125,12 +215,8 @@ impl HuaweiFramebufferRenderer {
 
         unsafe {
             gl.disable(gl::SCISSOR_TEST);
-            gl.viewport(
-                0,
-                0,
-                self.view_resolution.x as i32,
-                self.view_resolution.y as i32,
-            );
+            let side = clamp_side(&self.context, self.view_resolution);
+            gl.viewport(0, 0, side, side);
             gl.color_mask(true, true, true, true);
             gl.clear_color(0.027, 0.078, 0.118, 1.0);
             gl.clear(gl::COLOR_BUFFER_BIT);
@@ -174,6 +260,29 @@ impl HuaweiFramebufferRenderer {
             }
 
             let eye_bit = 1_u8 << eye;
+
+            // Hand this eye to the runtime while it is still on screen: the other eye draws over the
+            // same rectangle and the swap below invalidates the back buffer.
+            if let Some(texture) = self.eye_textures[eye]
+                .first()
+                .and_then(|id| NonZeroU32::new(*id))
+                .map(gl::NativeTexture)
+            {
+                let captured = blit_default_fbo_to_eye_texture(
+                    gl,
+                    &self.scratch_fbos[eye],
+                    texture,
+                    self.view_resolution,
+                    side,
+                );
+                if self.logged_capture.get() & eye_bit == 0 {
+                    info!(
+                        "[HVR-DIAG] lobby eye {eye}: {}x{side} fbo0 -> eye texture {}x{} (side={side}), ok={captured}",
+                        side, self.view_resolution.x, self.view_resolution.y
+                    );
+                    self.logged_capture.set(self.logged_capture.get() | eye_bit);
+                }
+            }
             if self.logged_eyes.get() & eye_bit == 0 {
                 // These queries are synchronous and block as soon as the GPU queue backs up, so
                 // only ask once per eye.
@@ -216,6 +325,9 @@ pub struct HuaweiStreamRenderer {
     entered_eyes: Cell<u8>,
     gl_ready_eyes: Cell<u8>,
     logged_eyes: Cell<u8>,
+    eye_textures: [Vec<u32>; 2],
+    scratch_fbos: [Cell<Option<gl::Framebuffer>>; 2],
+    logged_capture: Cell<u8>,
 }
 
 impl HuaweiStreamRenderer {
@@ -223,6 +335,7 @@ impl HuaweiStreamRenderer {
         context: Rc<GraphicsContext>,
         view_resolution: UVec2,
         fix_limited_range: bool,
+        eye_textures: [Vec<u32>; 2],
     ) -> Self {
         Self {
             context,
@@ -233,6 +346,9 @@ impl HuaweiStreamRenderer {
             entered_eyes: Cell::new(0),
             gl_ready_eyes: Cell::new(0),
             logged_eyes: Cell::new(0),
+            eye_textures,
+            scratch_fbos: [Cell::new(None), Cell::new(None)],
+            logged_capture: Cell::new(0),
         }
     }
 
@@ -297,12 +413,8 @@ impl HuaweiStreamRenderer {
         gl.disable(gl::DEPTH_TEST);
         gl.disable(gl::CULL_FACE);
         gl.disable(gl::BLEND);
-        gl.viewport(
-            0,
-            0,
-            self.view_resolution.x as i32,
-            self.view_resolution.y as i32,
-        );
+        let side = clamp_side(&self.context, self.view_resolution);
+        gl.viewport(0, 0, side, side);
         gl.color_mask(true, true, true, true);
 
         if eye == 0 {
@@ -337,6 +449,29 @@ impl HuaweiStreamRenderer {
         }
 
         gl.flush();
+
+        // Hand this eye to the runtime before the second eye paints over the same rectangle and
+        // before `swap_huawei_buffers()` throws the back buffer away.
+        if let Some(texture) = self.eye_textures[eye]
+            .first()
+            .and_then(|id| NonZeroU32::new(*id))
+            .map(gl::NativeTexture)
+        {
+            let captured = blit_default_fbo_to_eye_texture(
+                gl,
+                &self.scratch_fbos[eye],
+                texture,
+                self.view_resolution,
+                side,
+            );
+            if self.logged_capture.get() & eye_bit == 0 {
+                info!(
+                    "[HVR-DIAG] stream eye {eye}: {side}x{side} fbo0 -> eye texture {}x{} ok={captured}",
+                    self.view_resolution.x, self.view_resolution.y
+                );
+                self.logged_capture.set(self.logged_capture.get() | eye_bit);
+            }
+        }
 
         if eye == 1 {
             if let Some(imported_frame) = self.imported_frame.borrow_mut().take() {

@@ -42,6 +42,25 @@ use stream::StreamContext;
 #[cfg(target_os = "android")]
 static HUAWEI_EXIT_REQUESTED: AtomicBool = AtomicBool::new(false);
 
+/// 用「VR Glass 直接挂在我们自写 XrShim 上」的模式（例如 RK3566 盒子 HDMI 直连）时，
+/// 放一个 `<files>/submit_frames` 文件，内容 1/true/yes，ALVR 就会每帧 xrEndFrame，
+/// 由 shim 里的合成器做左右眼 SBS 输出。真华为手机上没有这个文件，行为不变。
+#[cfg(target_os = "android")]
+fn submit_frames_override() -> bool {
+    std::fs::read_to_string("/sdcard/Android/data/com.lht.huaweivr.alvr/files/submit_frames")
+        .map(|s| {
+            let s = s.trim().to_ascii_lowercase();
+            s == "1" || s == "true" || s == "yes" || s == "on"
+        })
+        .unwrap_or(false)
+}
+
+#[cfg(not(target_os = "android"))]
+#[allow(dead_code)]
+fn submit_frames_override() -> bool {
+    false
+}
+
 #[cfg(target_os = "android")]
 fn request_huawei_exit() {
     HUAWEI_EXIT_REQUESTED.store(true, Ordering::Release);
@@ -587,6 +606,16 @@ fn entry_point_with_window(_huawei_native_window: Option<*mut c_void>) {
             Duration::from_secs_f64(1.0 / hz as f64)
         });
 
+        // 真华为设备上，华为运行时会自己合成 app 的 EGL surface，所以 ALVR 不能提交图层；
+        // 但换成我们自写的 XrShim（例如把 VR Glass 直接接在 RK3566 盒子的 HDMI 上）时，
+        // 合成是由 shim 里的 xrEndFrame 做的，ALVR 必须每帧提交，否则画面永远上不了屏。
+        // 用 files/submit_frames 这个文件区分两者。
+        let huawei_submit_frames = platform.is_huawei() && submit_frames_override();
+        let huawei_native_compositor = platform.is_huawei() && !huawei_submit_frames;
+        if huawei_submit_frames {
+            info!("[HVR-DIAG] Huawei shim compositor: 每帧提交图层 (xrEndFrame)");
+        }
+
         let mut event_storage = xr::EventDataBuffer::new();
         // Temporary trace: if the Huawei render thread stalls, these tell us which call blocks.
         let mut loop_trace = 0_u32;
@@ -820,14 +849,14 @@ fn entry_point_with_window(_huawei_native_window: Option<*mut c_void>) {
             // call order. Since a begun frame is a precondition for xrAcquireSwapchainImage, the
             // Huawei renderers never touch an OpenXR swapchain either -- they draw into the HVR
             // surface handed over by Java, and nothing is submitted when the frame ends.
-            if !platform.is_huawei() {
+            if !huawei_native_compositor {
                 if let Err(e) = xr_frame_stream.begin() {
                     panic!("xrBeginFrame failed: {e}");
                 }
             }
 
             if !frame_state.should_render {
-                if !platform.is_huawei() {
+                if !huawei_native_compositor {
                     let _ = xr_frame_stream.end(
                         frame_state.predicted_display_time,
                         xr::EnvironmentBlendMode::OPAQUE,
@@ -864,10 +893,9 @@ fn entry_point_with_window(_huawei_native_window: Option<*mut c_void>) {
                 info!("[HVR-DIAG] frame {}: render done", loop_trace - 1);
             }
 
-            if platform.is_huawei() {
-                // The runtime composites the HVR surface the application just drew into and
-                // rejects every frame-loop submission, so there is nothing to end. Pace the loop
-                // ourselves instead of waiting for a vsync the runtime never reports.
+            if huawei_native_compositor {
+                // 真华为设备：华为运行时会合成 app 刚画进去的那个 surface，并且拒绝所有
+                // 帧循环提交，所以这里什么都不用结束；自己按固定周期节拍即可。
                 thread::sleep(huawei_frame_period.unwrap_or(frame_interval));
 
                 continue;

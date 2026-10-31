@@ -133,6 +133,21 @@ pub fn platform() -> Platform {
             "manufacturer: {manufacturer}, model: {model}, device: {device}, product: {product}"
         );
 
+        // 允许把非华为设备（例如把 VR Glass 直接挂在 HDMI 上的 RK3566 盒子）
+        // 强制切到华为分支：
+        //   adb shell "echo huawei > /sdcard/Android/data/com.lht.huaweivr.alvr/files/platform"
+        // 用文件而不是系统属性，是因为 android.os.Build 的静态字段在 zygote 里
+        // 就初始化完了，resetprop 改 ro.product.manufacturer 对已运行进程无效。
+        if let Ok(forced) = std::fs::read_to_string(
+            "/sdcard/Android/data/com.lht.huaweivr.alvr/files/platform",
+        ) {
+            let forced = forced.trim().to_ascii_lowercase();
+            if matches!(forced.as_str(), "huawei" | "huaweivrglass" | "huawei_vr_glass") {
+                alvr_common::info!("platform forced to HUAWEI VR Glass by override file");
+                return Platform::HuaweiVrGlass;
+            }
+        }
+
         match (
             manufacturer.as_str(),
             model.as_str(),

@@ -238,11 +238,11 @@ impl StreamContext {
 
         #[cfg(target_os = "android")]
         let renderer = if platform.is_huawei() {
-            let _ = swapchain_textures;
             StreamRendererBackend::Huawei(HuaweiStreamRenderer::new(
                 gfx_ctx,
                 target_view_resolution,
                 config.use_full_range && !config.enable_hdr,
+                swapchain_textures.clone(),
             ))
         } else {
             StreamRendererBackend::Standard(StreamRenderer::new(
