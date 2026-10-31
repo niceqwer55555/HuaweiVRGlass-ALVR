@@ -23,7 +23,7 @@ param(
     只会建议 /interaction_profiles/huawei/6dof_controller 这一个 profile，声明改成
     "3dof|6dof" 后 runtime 起的会话与该 profile 不匹配，6DoF 下手柄直接失灵；
     客户端又依赖已丢失的 openxrs-huawei fork，无法重编加运行时判定——所以保持两个包。
-    两个包可以共存：3DoF 变体的 applicationId 是 com.lht.huaweivr.alvr.3dof（manifest
+    两个包可以共存：3DoF 变体的 applicationId 是 com.lht.huaweivr.alvr.dof3（manifest
     package 属性整串替换），label 加（3DoF）后缀；dex 类名与 JNI 符号不受影响。
 
     freeDegree / 包名 / label 由 patch_apk_degree.py 改写（字符串池重建）。
@@ -122,7 +122,7 @@ foreach ($degree in $degrees) {
     $renamePackage = $null
     $label = $null
     if ($degree -eq '3dof') {
-        $renamePackage = 'com.lht.huaweivr.alvr.3dof'
+        $renamePackage = 'com.lht.huaweivr.alvr.dof3'
         $label = '华为 VR Glass 串流（3DoF）'
     }
 

@@ -201,9 +201,10 @@ pub fn get_installed_client_packages(
             }
         }
         ClientFlavor::Custom(name) => {
-            // The 3DoF coexistence variant is the same app with ".3dof" appended
-            // to the applicationId; accept either one.
-            let sibling = format!("{name}.3dof");
+            // The 3DoF coexistence variant is the same app with ".dof3" appended
+            // to the applicationId (a digit-leading segment like ".3dof" is an
+            // invalid Android package name); accept either one.
+            let sibling = format!("{name}.dof3");
             if alvr_common::is_stable() {
                 vec![
                     name.clone(),

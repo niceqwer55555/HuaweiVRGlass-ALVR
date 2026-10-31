@@ -259,7 +259,7 @@ if (-not $device) {
 $serial = $device.Serial
 
 Section '5. client package'
-# 3DoF 与 6DoF 两个变体可共存安装（3DoF 的包名多了 .3dof 后缀），都认出来。
+# 3DoF 与 6DoF 两个变体可共存安装（3DoF 的包名多了 .dof3 后缀），都认出来。
 $pkgList = Invoke-Adb @('-s', $serial, 'shell', 'pm', 'list', 'packages', 'com.lht.huaweivr.alvr')
 $installed = @()
 foreach ($hit in ($pkgList | Select-String -AllMatches 'package:(com\.lht\.huaweivr\.alvr[\w.]*)')) {
