@@ -23,7 +23,7 @@
 - 华为 SDK 可从成品 APK 恢复（libxr_loader.so SHA256 7D2CD6D4…E1B337）；缺 jar/aar 用 `scripts/huawei/repack-huawei-client.ps1`
 - 原版 .so refresh_rates 写死 70Hz；服务端 connection.rs 已改为 preferred_fps 低于声明值时直接采用
 - **原版 .so 里没有 freeDegree/setprop 判定逻辑**（仓库 huawei_session.rs 是 fork 后加的，从未进 .so）；它只含 `/interaction_profiles/huawei/6dof_controller`，freeDegree 必须与会话一一对应 → **3dof/6dof 必须分两个包**，单包 "3dof|6dof" 实测 6DoF 手柄失灵（2026-10-31）
-- 变体打包 `scripts/huawei/package-huawei-variants.ps1`（python patch_apk_degree.py 变长改写 freeDegree/包名/label，保持 .so stored；keystore build/alvr_client_android/debug.keystore）。**两包共存**：3dof 变体 applicationId=`com.lht.huaweivr.alvr.3dof`、label 带（3DoF）；dex 类名不动所以 JNI 有效；服务端 get_installed_client_packages 兜底 `.3dof` 后缀并挑运行中的变体
+- 变体打包 `scripts/huawei/package-huawei-variants.ps1`（python patch_apk_degree.py 变长改写 freeDegree/包名/label，保持 .so stored；keystore build/alvr_client_android/debug.keystore，密码 alvrclient）。**两包共存**：3dof 变体 applicationId=`com.lht.huaweivr.alvr.dof3`、label 带（3DoF）；**包名段不能以数字开头（.3dof 非法，会导致应用打不开，已踩坑）**；dex 类名不动所以 JNI 有效；服务端 get_installed_client_packages 兜底 `.dof3` 后缀并挑运行中的变体
 - interaction profile：runtime 只认 `/huawei/controller`(3DoF) 与 `/huawei/6dof_controller`；绑定建议有 full/core/minimal 降级；**绝不能同时建议两个 profile**（libvrsdk.so 崩溃）
 
 ## GPU 硬编（Windows 无解，勿再试）
