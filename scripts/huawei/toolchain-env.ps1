@@ -116,8 +116,10 @@ function Get-VrToolchain {
     function cfg-or-env {
         param([string]$Key, [string]$EnvName)
         if ($cfg.ContainsKey($Key)) { return $cfg[$Key] }
-        if ($EnvName -and (Get-Item "Env:$EnvName" -ErrorAction SilentlyContinue)) {
-            return (Get-Item "Env:$EnvName").Value
+        if ($EnvName) {
+            # 某些机器上 Get-Item "Env:$name" 会抛出 ArgumentException，改用 .NET 接口
+            $envValue = [System.Environment]::GetEnvironmentVariable($EnvName)
+            if ($envValue) { return $envValue }
         }
         return $null
     }
