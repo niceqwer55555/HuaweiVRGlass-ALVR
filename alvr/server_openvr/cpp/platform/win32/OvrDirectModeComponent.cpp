@@ -210,6 +210,12 @@ void OvrDirectModeComponent::Present(vr::SharedTextureHandle_t syncTexture) {
     uint32_t layerCount = m_submitLayer;
     m_submitLayer = 0;
 
+    /* 诊断用：Release 构建里 Debug() 被 #[cfg(debug_assertions)] 裁掉，日志里看不到
+     * 取帧过程的任何信息。这里用限流的 Warn（始终有效，会落到 session_log.txt）。 */
+    static int s_present_seq = 0;
+    int seq = s_present_seq++;
+    bool verbose = (seq < 30 || (seq % 300) == 0);
+
     if (m_prevTargetTimestampNs == m_targetTimestampNs) {
         Debug("Discard duplicated frame. FrameIndex=%llu (Ignoring)", m_targetTimestampNs);
         // return;
@@ -234,6 +240,14 @@ void OvrDirectModeComponent::Present(vr::SharedTextureHandle_t syncTexture) {
                 Debug(
                     "[VDispDvr] ACQUIRESYNC FAILED!!! hr=%d %p %ls", hr, hr, GetErrorStr(hr).c_str()
                 );
+                if (verbose) {
+                    Warn(
+                        "[HVRDBG] ACQUIRESYNC FAILED hr=0x%08x seq=%d layer=%u",
+                        (unsigned int)hr,
+                        seq,
+                        layerCount
+                    );
+                }
                 pKeyedMutex->Release();
                 m_presentMutex.unlock();
                 return;
@@ -242,6 +256,10 @@ void OvrDirectModeComponent::Present(vr::SharedTextureHandle_t syncTexture) {
     }
 
     CopyTexture(layerCount);
+
+    if (verbose) {
+        Warn("[HVRDBG] PRESENT ok seq=%d layer=%u", seq, layerCount);
+    }
 
     if (useMutex) {
         if (pKeyedMutex) {
@@ -274,6 +292,9 @@ void OvrDirectModeComponent::CopyTexture(uint32_t layerCount) {
     vr::VRTextureBounds_t bounds[MAX_LAYERS][2];
     vr::HmdMatrix34_t poses[MAX_LAYERS];
 
+    int found_left = 0;
+    int found_right = 0;
+
     for (uint32_t i = 0; i < layerCount; i++) {
         // Find left eye texture.
         HANDLE leftEyeTexture = (HANDLE)m_submitLayers[i][0].hTexture;
@@ -289,6 +310,7 @@ void OvrDirectModeComponent::CopyTexture(uint32_t layerCount) {
             );
         } else {
             Texture[i][0] = it->second.first->textures[it->second.second];
+            found_left++;
             D3D11_TEXTURE2D_DESC desc;
             Texture[i][0]->GetDesc(&desc);
 
@@ -304,9 +326,11 @@ void OvrDirectModeComponent::CopyTexture(uint32_t layerCount) {
                     layerCount,
                     rightEyeTexture
                 );
-                Texture[i][0].Reset();
+                // 注意：这里是上游笔误（原本写的是 [i][0]），会把左眼也丢掉
+                Texture[i][1].Reset();
             } else {
                 Texture[i][1] = it->second.first->textures[it->second.second];
+                found_right++;
             }
         }
 
@@ -315,6 +339,22 @@ void OvrDirectModeComponent::CopyTexture(uint32_t layerCount) {
         bounds[i][0] = m_submitLayers[i][0].bounds;
         bounds[i][1] = m_submitLayers[i][1].bounds;
         poses[i] = m_submitLayers[i][0].mHmdPose;
+    }
+
+    {
+        // 诊断用：确认合成器到底交了几层、句柄有没有解析成功
+        static int s_copy_seq = 0;
+        int cseq = s_copy_seq++;
+        if (cseq < 30 || (cseq % 300) == 0) {
+            Warn(
+                "[HVRDBG] COPY seq=%d layers=%u foundL=%d foundR=%d handleMap=%zu",
+                cseq,
+                layerCount,
+                found_left,
+                found_right,
+                m_handleMap.size()
+            );
+        }
     }
 
     // This can go away, but is useful to see it as a separate packet on the gpu in traces.
