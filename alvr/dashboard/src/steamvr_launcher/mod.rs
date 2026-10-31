@@ -78,6 +78,40 @@ pub fn resolve_steamvr_path(_input: &str) -> Option<PathBuf> {
     None
 }
 
+/// SteamVR runtime root for the configured path (or the bundled runtime), used
+/// to write openvrpaths.vrpath so SteamVR works without the Steam client.
+#[cfg(windows)]
+pub fn resolve_steamvr_runtime_root(input: &str) -> Option<PathBuf> {
+    windows_steamvr::resolve_steamvr_runtime_root(input)
+}
+
+#[cfg(not(windows))]
+pub fn resolve_steamvr_runtime_root(_input: &str) -> Option<PathBuf> {
+    None
+}
+
+/// Makes openvrpaths.vrpath exist and point at the configured SteamVR runtime.
+/// Without this file, driver registration fails silently and OpenVR games
+/// cannot find the runtime on machines without a Steam client installation.
+fn ensure_standalone_openvr_paths() {
+    #[cfg(windows)]
+    {
+        let Some(runtime_root) = resolve_steamvr_runtime_root(&manual_steamvr_path()) else {
+            warn!("Standalone config skipped: no SteamVR runtime found");
+            return;
+        };
+
+        match alvr_server_io::ensure_openvr_paths_file(&runtime_root) {
+            Ok(path) => debug!(
+                "openvrpaths ready: {} (runtime {})",
+                path.display(),
+                runtime_root.display()
+            ),
+            Err(err) => warn!("Failed to prepare openvrpaths.vrpath: {err:?}"),
+        }
+    }
+}
+
 pub fn is_steamvr_running() -> bool {
     System::new_all()
         .processes_by_name(OsStr::new(&afs::exec_fname("vrserver")))
@@ -276,6 +310,10 @@ impl Launcher {
 
         #[cfg(target_os = "linux")]
         linux_steamvr::linux_hardware_checks();
+
+        // Must run before driver registration and before SteamVR starts: it
+        // creates/repairs openvrpaths.vrpath for standalone (no Steam) setups.
+        ensure_standalone_openvr_paths();
 
         let alvr_driver_dir = crate::get_filesystem_layout().openvr_driver_root_dir;
 

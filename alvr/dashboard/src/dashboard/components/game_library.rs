@@ -230,6 +230,7 @@ pub struct GameLibraryTab {
     game_exe: String,
     game_args: String,
     sync_to_steam: bool,
+    register_manifest: bool,
     install: Option<SteamInstall>,
     shortcuts: Vec<Shortcut>,
     status: Option<(StatusKind, String)>,
@@ -253,6 +254,7 @@ impl GameLibraryTab {
             game_exe: String::new(),
             game_args: String::new(),
             sync_to_steam: false,
+            register_manifest: true,
             install,
             shortcuts,
             status: None,
@@ -293,6 +295,18 @@ impl GameLibraryTab {
 
     fn save_games(&mut self) {
         game_library::save_games(&self.games);
+    }
+
+    /// Creates/repairs openvrpaths.vrpath so SteamVR (and the games) work
+    /// without a Steam client installation. Returns an error message when the
+    /// runtime cannot be located.
+    fn ensure_standalone_config(&self) -> std::result::Result<PathBuf, String> {
+        let runtime_root =
+            crate::steamvr_launcher::resolve_steamvr_runtime_root(&self.steamvr_path)
+                .ok_or("未找到 SteamVR 运行时，请先在上方设置 SteamVR 启动路径")?;
+        alvr_server_io::ensure_openvr_paths_file(&runtime_root).map_err(|err| err.to_string())?;
+
+        Ok(runtime_root)
     }
 
     pub fn ui(&mut self, ui: &mut Ui) {
@@ -445,6 +459,18 @@ impl GameLibraryTab {
                 crate::steamvr_launcher::LAUNCHER.lock().restart_steamvr();
                 self.set_status(StatusKind::Ok, "已重启 SteamVR");
             }
+            if ui.button("配置独立运行").clicked() {
+                match self.ensure_standalone_config() {
+                    Ok(runtime_root) => self.set_status(
+                        StatusKind::Ok,
+                        format!(
+                            "已配置独立运行（openvrpaths.vrpath → {}），无需 Steam 客户端",
+                            runtime_root.display()
+                        ),
+                    ),
+                    Err(err) => self.set_status(StatusKind::Error, err),
+                }
+            }
         });
     }
 
@@ -494,8 +520,12 @@ impl GameLibraryTab {
                 ui.end_row();
             });
 
+        ui.checkbox(
+            &mut self.register_manifest,
+            "注册到 SteamVR 库（vrmanifest，免 Steam 可见，推荐）",
+        );
         if self.install.is_some() {
-            ui.checkbox(&mut self.sync_to_steam, "同时写入 Steam 库（可选，需已安装 Steam）");
+            ui.checkbox(&mut self.sync_to_steam, "同时写入 Steam 快捷方式（可选，需已安装 Steam）");
         }
 
         ui.add_space(6.0);
@@ -523,7 +553,7 @@ impl GameLibraryTab {
                         ) {
                             Ok((shortcut, _)) => {
                                 message.push_str(&format!(
-                                    "；已写入 Steam 库（AppID {}，重启 Steam 后可见）",
+                                    "；已写入 Steam 快捷方式（AppID {}，重启 Steam 后可见）",
                                     shortcut.app_id
                                 ));
                                 self.refresh_shortcuts();
@@ -532,6 +562,24 @@ impl GameLibraryTab {
                                 message.push_str(&format!("；写入 Steam 库失败：{err}"))
                             }
                         }
+                    }
+                }
+
+                if self.register_manifest {
+                    let registered = self.ensure_standalone_config().and_then(|_| {
+                        game_library::set_manifest_registered(&game, true)
+                            .map_err(|err| err.to_string())
+                    });
+                    match registered {
+                        Ok(path) => {
+                            let file_name = path
+                                .file_name()
+                                .map(|name| name.to_string_lossy().into_owned())
+                                .unwrap_or_default();
+                            message
+                                .push_str(&format!("；已注册到 SteamVR 库（{file_name}）"));
+                        }
+                        Err(err) => message.push_str(&format!("；注册 SteamVR 库失败：{err}")),
                     }
                 }
 
@@ -611,12 +659,29 @@ impl GameLibraryTab {
             if index < self.games.len() {
                 let removed = self.games.remove(index);
                 self.save_games();
+
+                // Best effort: also drop the SteamVR manifest registration.
+                let _ = game_library::set_manifest_registered(&removed, false);
+
                 self.set_status(StatusKind::Ok, format!("已删除「{}」", removed.name));
             }
         }
     }
 
     fn launch(&mut self, game: LocalGame) {
+        // Keep the standalone config and the game manifest in sync so SteamVR
+        // lists the game even without the Steam client. Failures are not
+        // fatal: the game still starts as a plain process.
+        if let Err(err) = self.ensure_standalone_config().and_then(|_| {
+            game_library::set_manifest_registered(&game, true)
+                .map_err(|err| err.to_string())
+        }) {
+            self.set_status(
+                StatusKind::Error,
+                format!("SteamVR 库同步失败（不影响启动游戏）：{err}"),
+            );
+        }
+
         let steamvr_running = crate::steamvr_launcher::is_steamvr_running();
 
         if !steamvr_running {

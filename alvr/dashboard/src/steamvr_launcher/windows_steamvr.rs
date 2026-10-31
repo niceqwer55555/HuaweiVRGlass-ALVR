@@ -53,6 +53,48 @@ pub fn resolve_steamvr_launch_path(input: &str) -> Option<PathBuf> {
     candidates.into_iter().find(|candidate| candidate.is_file())
 }
 
+/// Resolves the SteamVR runtime root (the folder containing
+/// `bin\win64\vrmonitor.exe`) for the configured path, or the bundled runtime.
+/// Used to write openvrpaths.vrpath for standalone operation.
+pub fn resolve_steamvr_runtime_root(input: &str) -> Option<PathBuf> {
+    if let Some(monitor) = resolve_steamvr_launch_path(input)
+        .or_else(bundled_steamvr_monitor_path)
+    {
+        let name = monitor
+            .file_name()
+            .map(|name| name.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+
+        if name == VRMONITOR_FNAME {
+            // <runtime>\bin\win64\vrmonitor.exe
+            return monitor
+                .parent()
+                .and_then(Path::parent)
+                .and_then(Path::parent)
+                .map(Path::to_path_buf);
+        }
+
+        // steam.exe / vrstartup.exe: runtime lives in steamapps\common\SteamVR
+        if let Some(parent) = monitor.parent() {
+            let runtime = parent.join("steamapps").join("common").join("SteamVR");
+            if runtime.join("bin").join("win64").join(VRMONITOR_FNAME).is_file() {
+                return Some(runtime);
+            }
+        }
+    }
+
+    // Nothing configured or bundled: fall back to the runtime that
+    // openvrpaths.vrpath already points at (e.g. a Steam-managed install).
+    alvr_server_io::steamvr_root_dir().ok().and_then(|runtime| {
+        runtime
+            .join("bin")
+            .join("win64")
+            .join(VRMONITOR_FNAME)
+            .is_file()
+            .then_some(runtime)
+    })
+}
+
 fn bundled_steamvr_monitor_path() -> Option<PathBuf> {
     let relative: PathBuf = [BUNDLED_STEAMVR_DIR, "SteamVR", "bin", "win64", VRMONITOR_FNAME]
         .iter()
