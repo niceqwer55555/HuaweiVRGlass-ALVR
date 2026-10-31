@@ -17,7 +17,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$DashboardExe = (Join-Path $PSScriptRoot '..\..\target\release\alvr_dashboard.exe'),
+    [string]$DashboardExe = (Join-Path $PSScriptRoot '..\..\build\target\release\alvr_dashboard.exe'),
     [string]$TemplateDir = 'D:\HuaweiVRGlass_ALVR_Windows_v0.5.0',
     [string]$OutputDir = (Join-Path $PSScriptRoot '..\..\build\end\server'),
     [string]$Archive = (Join-Path $PSScriptRoot '..\..\build\end\server.7z'),
