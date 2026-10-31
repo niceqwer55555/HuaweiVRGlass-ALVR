@@ -22,7 +22,8 @@
 - **唯一可用客户端 = 原作者 2026-08-15 的 libalvr_client_openxr.so**（67,581,504 B，SHA256 80068d91…02bd8，在 build/HuaweiVRGlass_ALVR_Android_v0.5.0.apk）；本机重编不等价（华为 fork 已丢，deps/openxrs-huawei 是官方占位），坏帧先怀疑编译链
 - 华为 SDK 可从成品 APK 恢复（libxr_loader.so SHA256 7D2CD6D4…E1B337）；缺 jar/aar 用 `scripts/huawei/repack-huawei-client.ps1`
 - 原版 .so refresh_rates 写死 70Hz；服务端 connection.rs 已改为 preferred_fps 低于声明值时直接采用
-- 3DoF/6DoF：会话由 APK manifest `com.huawei.vr.application.freeDegree` 声明；`adb shell setprop debug.alvr.degree 3dof` 可覆盖；变体打包 `scripts/huawei/package-huawei-variants.ps1`（UTF-16LE 等长替换+重签，keystore build/alvr_client_android/debug.keystore）；3DoF 时 rotation-only 手柄锚到头前，否则 SteamVR 菜单掉出视野
+- **原版 .so 里没有 freeDegree/setprop 判定逻辑**（仓库 huawei_session.rs 是 fork 后加的，从未进 .so）；它只含 `/interaction_profiles/huawei/6dof_controller`，freeDegree 必须与会话一一对应 → **3dof/6dof 必须分两个包**，单包 "3dof|6dof" 实测 6DoF 手柄失灵（2026-10-31）
+- 变体打包 `scripts/huawei/package-huawei-variants.ps1`（python patch_apk_degree.py 变长改写 freeDegree/包名/label，保持 .so stored；keystore build/alvr_client_android/debug.keystore）。**两包共存**：3dof 变体 applicationId=`com.lht.huaweivr.alvr.3dof`、label 带（3DoF）；dex 类名不动所以 JNI 有效；服务端 get_installed_client_packages 兜底 `.3dof` 后缀并挑运行中的变体
 - interaction profile：runtime 只认 `/huawei/controller`(3DoF) 与 `/huawei/6dof_controller`；绑定建议有 full/core/minimal 降级；**绝不能同时建议两个 profile**（libvrsdk.so 崩溃）
 
 ## GPU 硬编（Windows 无解，勿再试）

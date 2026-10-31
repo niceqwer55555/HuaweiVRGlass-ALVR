@@ -259,12 +259,18 @@ if (-not $device) {
 $serial = $device.Serial
 
 Section '5. client package'
-$pkg = Invoke-Adb @('-s', $serial, 'shell', 'pm', 'list', 'packages', 'com.lht.huaweivr.alvr')
-if ($pkg -match 'package:com\.lht\.huaweivr\.alvr') {
-    Good 'com.lht.huaweivr.alvr installed'
+# 3DoF 与 6DoF 两个变体可共存安装（3DoF 的包名多了 .3dof 后缀），都认出来。
+$pkgList = Invoke-Adb @('-s', $serial, 'shell', 'pm', 'list', 'packages', 'com.lht.huaweivr.alvr')
+$installed = @()
+foreach ($hit in ($pkgList | Select-String -AllMatches 'package:(com\.lht\.huaweivr\.alvr[\w.]*)')) {
+    $installed += $hit.Matches[0].Groups[1].Value
+}
+$installed = $installed | Select-Object -Unique
+if ($installed.Count -gt 0) {
+    Good ("installed client package(s): " + ($installed -join ', '))
 } else {
-    Bad 'com.lht.huaweivr.alvr is NOT installed on the device'
-    Info 'Install the ALVR Huawei client APK (build\HuaweiVRGlass_ALVR_Android_v0.5.0_3dof_original.apk).'
+    Bad 'no com.lht.huaweivr.alvr* package is installed on the device'
+    Info 'Install one of the ALVR Huawei client APKs (build\HuaweiVRGlass_ALVR_Android_v0.5.0_{3dof,6dof}.apk).'
 }
 
 Section '6. port forwarding'
@@ -276,16 +282,23 @@ foreach ($port in 9943, 9944) {
 Info ((Invoke-Adb @('-s', $serial, 'forward', '--list')) -replace "`n", '; ')
 
 Section '7. VR client'
-$clientPid = Invoke-Adb @('-s', $serial, 'shell', 'pidof', 'com.lht.huaweivr.alvr')
-if ($clientPid -match '\d+') {
-    Good "client already running (pid $($clientPid.Trim()))"
-} elseif ($Restore -or $Watch) {
+# 挑正在运行的那个变体；都没跑就按 6DoF 包优先拉起（dex 里的类名两边相同）。
+$runningPkg = $null
+foreach ($candidate in $installed) {
+    $pidOut = Invoke-Adb @('-s', $serial, 'shell', 'pidof', $candidate)
+    if ($pidOut -match '\d+') { $runningPkg = $candidate; break }
+}
+if ($runningPkg) {
+    $pidOut = Invoke-Adb @('-s', $serial, 'shell', 'pidof', $runningPkg)
+    Good "client running: $runningPkg (pid $($pidOut.Trim()))"
+} elseif (($Restore -or $Watch) -and $installed.Count -gt 0) {
+    $launchPkg = if ($installed -contains 'com.lht.huaweivr.alvr') { 'com.lht.huaweivr.alvr' } else { $installed[0] }
     Info (Invoke-Adb @('-s', $serial, 'shell', 'am', 'start',
             '-a', 'com.huawei.android.vr.action.MAIN',
-            '-n', 'com.lht.huaweivr.alvr/.HuaweiVrActivity'))
+            '-n', "$launchPkg/com.lht.huaweivr.alvr.HuaweiVrActivity"))
     Start-Sleep -Seconds 3
-    $clientPid = Invoke-Adb @('-s', $serial, 'shell', 'pidof', 'com.lht.huaweivr.alvr')
-    if ($clientPid -match '\d+') { Good "client started (pid $($clientPid.Trim()))" }
+    $pidOut = Invoke-Adb @('-s', $serial, 'shell', 'pidof', $launchPkg)
+    if ($pidOut -match '\d+') { Good "client started (pid $($pidOut.Trim()))" }
     else { Bad 'client did not start - the glasses are probably not attached to the phone' }
 } else {
     Warn 'client not running (run with -Restore to start it in VR mode)'

@@ -576,8 +576,9 @@ impl GameLibraryTab {
                                 .file_name()
                                 .map(|name| name.to_string_lossy().into_owned())
                                 .unwrap_or_default();
-                            message
-                                .push_str(&format!("；已注册到 SteamVR 库（{file_name}）"));
+                            message.push_str(&format!(
+                                "；已注册到 SteamVR 库（{file_name}，重启 SteamVR 后可见）"
+                            ));
                         }
                         Err(err) => message.push_str(&format!("；注册 SteamVR 库失败：{err}")),
                     }

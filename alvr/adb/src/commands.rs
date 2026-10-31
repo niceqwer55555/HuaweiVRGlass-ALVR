@@ -222,6 +222,21 @@ pub fn start_application_with_action(
 }
 
 //////////
+/// Connects to a phone reachable over WiFi (wireless debugging / `adb tcpip`).
+///
+/// The serial of such a device then looks like "192.168.x.x:5555" and every
+/// other adb command (forward, shell, install) works exactly like over USB.
+pub fn connect_wireless(adb_path: &str, address: &str) -> Result<bool> {
+    let output = get_command(adb_path, &["connect", address])
+        .output()
+        .context(format!("Failed to run adb connect {address}"))?;
+    let text = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+
+    // adb answers "connected to <address>" or "already connected to <address>"
+    // on success and anything else (timeout, refused, offline) on failure.
+    Ok(text.contains("connected to"))
+}
+
 // Devices
 
 /// Serial numbers of devices attached over USB and ready to be used.

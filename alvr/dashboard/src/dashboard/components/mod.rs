@@ -14,8 +14,6 @@ mod statistics;
 mod game_library;
 #[cfg(not(target_arch = "wasm32"))]
 mod installation;
-#[cfg(windows)]
-mod wired_display;
 
 pub use about::*;
 pub use appearance::*;
@@ -33,5 +31,3 @@ pub use statistics::*;
 pub use game_library::*;
 #[cfg(not(target_arch = "wasm32"))]
 pub use installation::*;
-#[cfg(windows)]
-pub use wired_display::*;

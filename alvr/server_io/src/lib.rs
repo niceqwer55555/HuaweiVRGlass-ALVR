@@ -1,11 +1,7 @@
-#[cfg(windows)]
-pub mod display;
 mod firewall;
 mod openvr_drivers;
 mod openvrpaths;
 
-#[cfg(windows)]
-pub use display::*;
 pub use firewall::*;
 pub use openvr_drivers::*;
 pub use openvrpaths::*;
@@ -17,6 +13,7 @@ use alvr_common::{
 use alvr_events::EventType;
 use alvr_packets::{ClientListAction, PathSegment, PathValuePair};
 use alvr_session::{ClientConnectionConfig, SessionConfig, Settings};
+use alvr_sockets::WIRED_CLIENT_HOSTNAME;
 use serde_json as json;
 use std::{
     collections::{hash_map::Entry, HashMap},
@@ -202,6 +199,7 @@ impl ServerSessionManager {
     pub fn update_client_list(&mut self, hostname: String, action: ClientListAction) {
         let mut client_connections = self.session_config.client_connections.clone();
 
+        let is_wired_client = hostname == WIRED_CLIENT_HOSTNAME;
         let maybe_client_entry = client_connections.entry(hostname);
 
         let mut updated = false;
@@ -210,14 +208,21 @@ impl ServerSessionManager {
                 trusted,
                 manual_ips,
             } => {
-                if let Entry::Vacant(new_entry) = maybe_client_entry {
-                    let client_connection_desc = ClientConnectionConfig {
-                        display_name: "Unknown".into(),
-                        current_ip: None,
-                        manual_ips: manual_ips.into_iter().collect(),
-                        trusted,
-                        connection_state: ConnectionState::Disconnected,
-                    };
+            if let Entry::Vacant(new_entry) = maybe_client_entry {
+                // The wired client is created by the dashboard switch, never by a
+                // client handshake, so "Unknown" would be all the user ever sees.
+                let display_name = if is_wired_client {
+                    "HUAWEI VR Glass (USB)".into()
+                } else {
+                    "Unknown".into()
+                };
+                let client_connection_desc = ClientConnectionConfig {
+                    display_name,
+                    current_ip: None,
+                    manual_ips: manual_ips.into_iter().collect(),
+                    trusted,
+                    connection_state: ConnectionState::Disconnected,
+                };
                     new_entry.insert(client_connection_desc);
 
                     updated = true;

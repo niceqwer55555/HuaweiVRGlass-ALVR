@@ -41,7 +41,7 @@
         <!-- Huawei accepts "3dof", "6dof" or the dual marker "3dof|6dof":
              with the dual marker the runtime starts either session type and the
              app picks the matching interaction profile itself. -->
-        <meta-data android:name="com.huawei.vr.application.freeDegree" android:value="3dof|6dof" />
+        <meta-data android:name="com.huawei.vr.application.freeDegree" android:value="6dof" />
         <meta-data android:name="android.max_aspect" android:value="2.1" />
 
         <activity

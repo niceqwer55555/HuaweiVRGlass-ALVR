@@ -12,20 +12,24 @@ param(
 )
 
 <#
-    从同一份原生库打包出双自由度（3dof|6dof）APK。
+    从同一份原生库打包出 3dof / 6dof 两个 APK（可共存安装）。
 
     华为 VR 框架按应用自己声明的 meta-data 决定要起哪一种会话：
 
-        <meta-data android:name="com.huawei.vr.application.freeDegree" android:value="3dof|6dof" />
+        <meta-data android:name="com.huawei.vr.application.freeDegree" android:value="6dof" />
 
-    "6dof" = 视觉定位套件 + 两只手柄，"3dof" = 眼镜 IMU + 小遥控器，"3dof|6dof" = 两种都允许，
-    由 runtime 按实际接入的手柄放行（官方文档：值为 "3dof|6dof" 时应用同时支持两种手柄）。
-    客户端运行时会把自己声明的自由度读回来（alvr/client_openxr/src/huawei_session.rs），
-    因此一个 APK 即可覆盖两种会话；manifest 的取值由 patch_apk_degree.py 改写（字符串池会重建，
-    不能像过去那样等长覆盖）。
+    "6dof" = 视觉定位套件 + 两只手柄，"3dof" = 眼镜 IMU + 小遥控器。
+    曾经试过合并成 "3dof|6dof" 单包，但现役客户端二进制（libalvr_client_openxr.so）
+    只会建议 /interaction_profiles/huawei/6dof_controller 这一个 profile，声明改成
+    "3dof|6dof" 后 runtime 起的会话与该 profile 不匹配，6DoF 下手柄直接失灵；
+    客户端又依赖已丢失的 openxrs-huawei fork，无法重编加运行时判定——所以保持两个包。
+    两个包可以共存：3DoF 变体的 applicationId 是 com.lht.huaweivr.alvr.3dof（manifest
+    package 属性整串替换），label 加（3DoF）后缀；dex 类名与 JNI 符号不受影响。
+
+    freeDegree / 包名 / label 由 patch_apk_degree.py 改写（字符串池重建）。
 
     用法：
-        .\package-huawei-variants.ps1 -NativeLibrary target\armv7-linux-androideabi\release\libalvr_client_openxr.so
+        .\package-huawei-variants.ps1 -NativeLibrary <libalvr_client_openxr.so>
 #>
 
 $ErrorActionPreference = 'Stop'
@@ -78,94 +82,76 @@ if (-not (Test-Path -LiteralPath $Keystore -PathType Leaf)) {
     throw "找不到签名：$Keystore（可用 -Keystore / -KeystorePassword 指定）"
 }
 
-$nativeEntryName = 'lib/armeabi-v7a/libalvr_client_openxr.so'
-$manifestEntryName = 'AndroidManifest.xml'
 $workRoot = Join-Path $repoRoot 'build\huawei_variants'
 if (-not (Test-Path -LiteralPath $workRoot)) {
     New-Item -ItemType Directory -Path $workRoot -Force | Out-Null
 }
 
-# 双自由度标记：runtime 按实际接入的手柄放行 3DoF / 6DoF，应用只需一个包。
-$dualDegree = '3dof|6dof'
+# 两个变体：现役客户端只会建议 6dof_controller profile，必须与会话声明一一对应。
+$degrees = @('3dof', '6dof')
 
 $stem = [System.IO.Path]::GetFileNameWithoutExtension($BaseApk) -replace '_(3dof6dof|3dof|6dof)$', ''
 
-Add-Type -AssemblyName System.IO.Compression
-Add-Type -AssemblyName System.IO.Compression.FileSystem
+# patch_apk_degree.py 一次完成：改 freeDegree + 换 .so（保持 stored 不压缩）+ 丢旧签名。
+# 不用 .NET ZipArchive 重打包：它会把 .so 压成 deflate，extractNativeLibs=false 时加载失败。
+$python = $null
+foreach ($candidate in @(
+        (Get-Command python3 -ErrorAction SilentlyContinue).Source,
+        (Get-Command python -ErrorAction SilentlyContinue).Source,
+        (Get-ChildItem (Join-Path $env:USERPROFILE '.workbuddy\binaries\python\versions\*\python.exe') -ErrorAction SilentlyContinue |
+            Select-Object -First 1 -ExpandProperty FullName)
+    )) {
+    if (-not $candidate -or -not (Test-Path -LiteralPath $candidate -PathType Leaf)) { continue }
 
-$variant = '3dof6dof'
-$unsignedApk = Join-Path $workRoot "$stem`_$variant`_stripped.apk"
-$dualApk = Join-Path $workRoot "$stem`_$variant`_unsigned.apk"
-$alignedApk = Join-Path $workRoot "$stem`_$variant`_aligned.apk"
-$signedApk = Join-Path $OutputDirectory "$stem`_$variant.apk"
-
-Write-Host "重打包（换 .so、丢弃旧签名）：$unsignedApk"
-
-$source = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path -LiteralPath $BaseApk).Path)
-try {
-    # File::Create truncates, so a leftover file from a previous run is fine.
-    $stream = [System.IO.File]::Create($unsignedApk)
+    # Microsoft Store 的 python.exe 占位 stub 不是有效应用，实测跑一下才知道。
     try {
-        $target = New-Object System.IO.Compression.ZipArchive($stream, [System.IO.Compression.ZipArchiveMode]::Create)
-        try {
-            $nativeWritten = $false
-
-            foreach ($entry in $source.Entries) {
-                # 旧签名在重打包后失效，必须丢弃再签。
-                if ($entry.FullName.StartsWith('META-INF/', [System.StringComparison]::OrdinalIgnoreCase)) { continue }
-
-                if ($entry.FullName -eq $nativeEntryName) {
-                    $created = $target.CreateEntry($nativeEntryName, [System.IO.Compression.CompressionLevel]::NoCompression)
-                    $writeStream = $created.Open()
-                    try {
-                        $inputStream = [System.IO.File]::OpenRead((Resolve-Path -LiteralPath $NativeLibrary).Path)
-                        try { $inputStream.CopyTo($writeStream) }
-                        finally { $inputStream.Dispose() }
-                    }
-                    finally { $writeStream.Dispose() }
-                    $nativeWritten = $true
-                    continue
-                }
-
-                $created = $target.CreateEntry($entry.FullName, [System.IO.Compression.CompressionLevel]::NoCompression)
-                $writeStream = $created.Open()
-                try {
-                    $readStream = $entry.Open()
-                    try { $readStream.CopyTo($writeStream) }
-                    finally { $readStream.Dispose() }
-                }
-                finally { $writeStream.Dispose() }
-            }
-
-            if (-not $nativeWritten) { throw "基础 APK 中没有 $nativeEntryName" }
-        }
-        finally { $target.Dispose() }
-    }
-    finally { $stream.Dispose() }
+        & $candidate --version *> $null
+        if ($LASTEXITCODE -eq 0) { $python = $candidate; break }
+    } catch { }
 }
-finally { $source.Dispose() }
-
-# manifest 的 freeDegree 要改成 "3dof|6dof"：字符串变长，必须重建二进制 XML 字符串池，
-# 不能再用等长字节覆盖（"3dof|6dof" 里本身就含有 "6dof" 子串）。
-$python = (Get-Command python -ErrorAction SilentlyContinue)
-if (-not $python) { throw 'Need python on PATH to rewrite AndroidManifest.xml (freeDegree)' }
+if (-not $python) { throw 'Need a working python on PATH to rewrite AndroidManifest.xml (freeDegree)' }
 $patcher = Join-Path $PSScriptRoot 'patch_apk_degree.py'
-Write-Host "改写 freeDegree -> $dualDegree"
-& $python.Source $patcher $unsignedApk $dualApk $dualDegree
-if ($LASTEXITCODE -ne 0) { throw 'patch_apk_degree.py failed' }
 
-Write-Host "对齐：$alignedApk"
-& $zipalign -p -f 4 $dualApk $alignedApk
-if ($LASTEXITCODE -ne 0) { throw 'zipalign failed' }
+foreach ($degree in $degrees) {
+    $patchedApk = Join-Path $workRoot "$stem`_$degree`_unsigned.apk"
+    $alignedApk = Join-Path $workRoot "$stem`_$degree`_aligned.apk"
+    $signedApk = Join-Path $OutputDirectory "$stem`_$degree.apk"
 
-Write-Host "签名：$signedApk"
-& $apksigner sign --ks $Keystore --ks-key-alias $KeystoreAlias `
-    --ks-pass "pass:$KeystorePassword" --key-pass "pass:$KeystorePassword" `
-    --out $signedApk $alignedApk
-if ($LASTEXITCODE -ne 0) { throw 'apksigner sign failed' }
+    # 3DoF 变体换 applicationId 并改桌面名，与 6DoF 包共存安装。
+    # dex 类名与 .so 的 JNI 符号都不动（manifest 里 activity 是全限定名）。
+    $renamePackage = $null
+    $label = $null
+    if ($degree -eq '3dof') {
+        $renamePackage = 'com.lht.huaweivr.alvr.3dof'
+        $label = '华为 VR Glass 串流（3DoF）'
+    }
 
-& $apksigner verify $signedApk
-if ($LASTEXITCODE -ne 0) { throw 'apksigner verify failed' }
+    Write-Host "改写 freeDegree -> $degree$(if ($renamePackage) { "（包名 $renamePackage，label $label）" })"
+    $patchArgs = @(
+        $patcher,
+        (Resolve-Path -LiteralPath $BaseApk).Path,
+        $patchedApk,
+        $degree,
+        '--native', (Resolve-Path -LiteralPath $NativeLibrary).Path
+    )
+    if ($renamePackage) { $patchArgs += @('--rename-package', $renamePackage) }
+    if ($label) { $patchArgs += @('--label', $label) }
+    & $python @patchArgs
+    if ($LASTEXITCODE -ne 0) { throw 'patch_apk_degree.py failed' }
+
+    Write-Host "对齐：$alignedApk"
+    & $zipalign -p -f 4 $patchedApk $alignedApk
+    if ($LASTEXITCODE -ne 0) { throw 'zipalign failed' }
+
+    Write-Host "签名：$signedApk"
+    & $apksigner sign --ks $Keystore --ks-key-alias $KeystoreAlias `
+        --ks-pass "pass:$KeystorePassword" --key-pass "pass:$KeystorePassword" `
+        --out $signedApk $alignedApk
+    if ($LASTEXITCODE -ne 0) { throw 'apksigner sign failed' }
+
+    & $apksigner verify $signedApk
+    if ($LASTEXITCODE -ne 0) { throw 'apksigner verify failed' }
+}
 
 Write-Host "完成：$OutputDirectory"
-Get-ChildItem -LiteralPath $OutputDirectory -Filter "$stem*.apk"
+Get-ChildItem -LiteralPath $OutputDirectory -Filter "$stem`_*.apk"

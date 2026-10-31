@@ -154,6 +154,34 @@ pub fn manifest_path(game: &LocalGame) -> Option<PathBuf> {
     )))
 }
 
+/// Builds the manifest body. `SteamVR` only accepts the official layout: a top
+/// level `applications` array and the display name under
+/// `strings.en_us.name` (see SteamVR's own `tools.vrmanifest`).
+fn manifest_json(game: &LocalGame, app_key: &str, exe: &Path) -> serde_json::Value {
+    let working_dir = exe
+        .parent()
+        .map(|parent| parent.display().to_string())
+        .unwrap_or_default();
+
+    serde_json::json!({
+        "applications": [
+            {
+                "app_key": app_key,
+                "launch_type": "binary",
+                "binary_path_windows": exe.display().to_string(),
+                "arguments": game.args.clone(),
+                "working_directory": working_dir,
+                "image_path": "",
+                "strings": {
+                    "en_us": {
+                        "name": game.name,
+                    }
+                },
+            }
+        ],
+    })
+}
+
 /// Writes the SteamVR manifest for `game`. Returns the manifest path.
 pub fn write_manifest(game: &LocalGame) -> Result<PathBuf> {
     let exe = Path::new(game.exe.trim().trim_matches('"'));
@@ -166,28 +194,10 @@ pub fn write_manifest(game: &LocalGame) -> Result<PathBuf> {
     let dir = dir.join(MANIFEST_DIR);
     fs::create_dir_all(&dir).with_context(|| format!("无法创建目录 {}", dir.display()))?;
 
-    let path = dir.join(format!(
-        "local.{}.vrmanifest",
-        manifest_slug(&game.name)
-    ));
+    let slug = manifest_slug(&game.name);
+    let path = dir.join(format!("local.{slug}.vrmanifest"));
 
-    let working_dir = exe
-        .parent()
-        .map(|parent| parent.display().to_string())
-        .unwrap_or_default();
-    let name = game.name.clone();
-
-    let manifest = serde_json::json!({
-        "app_key": format!("local.{}", manifest_slug(&game.name)),
-        "launch_type": "binary",
-        "binary_path_windows": exe.display().to_string(),
-        "arguments": game.args.clone(),
-        "working_directory": working_dir,
-        "name": { "en_US": name, "zh_CN": name },
-        "sort_order": 0,
-        "is_overlay": false,
-        "should_run_in_steamvr": true,
-    });
+    let manifest = manifest_json(game, &format!("local.{slug}"), exe);
 
     fs::write(&path, serde_json::to_string_pretty(&manifest)?)
         .with_context(|| format!("无法写入 {}", path.display()))?;
@@ -211,7 +221,8 @@ pub fn set_manifest_registered(game: &LocalGame, register: bool) -> Result<PathB
 
 #[cfg(test)]
 mod tests {
-    use super::{manifest_slug, split_args};
+    use super::{manifest_json, manifest_slug, split_args, LocalGame};
+    use std::path::Path;
 
     #[test]
     fn splits_quoted_arguments() {
@@ -240,5 +251,25 @@ mod tests {
         assert!(b.starts_with("game-"));
         assert_ne!(a, b);
         assert_eq!(manifest_slug("节奏光剑"), a);
+    }
+
+    #[test]
+    fn manifest_uses_official_applications_layout() {
+        let game = LocalGame {
+            name: "Beat Saber".into(),
+            exe: r"D:\game\VR\Beat Saber.exe".into(),
+            args: String::new(),
+        };
+
+        let value = manifest_json(&game, "local.beat-saber", Path::new(&game.exe));
+
+        let app = &value["applications"][0];
+        assert_eq!(app["app_key"], "local.beat-saber");
+        assert_eq!(app["launch_type"], "binary");
+        assert_eq!(
+            app["strings"]["en_us"]["name"], "Beat Saber",
+            "display name must live under strings.en_us.name"
+        );
+        assert!(value["name"].is_null());
     }
 }

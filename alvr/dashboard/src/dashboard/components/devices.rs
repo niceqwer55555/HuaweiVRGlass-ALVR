@@ -231,7 +231,14 @@ fn wired_client_section(
                         ui.end_row();
                     } else if let Some((_, data)) = maybe_client {
                         ui.horizontal(|ui| {
-                            ui.label(&data.display_name);
+                            let display_name = if data.display_name.is_empty()
+                                || data.display_name == "Unknown"
+                            {
+                                "HUAWEI VR Glass (USB)".to_owned()
+                            } else {
+                                data.display_name.clone()
+                            };
+                            ui.label(display_name);
                         });
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             connection_label(ui, &data.connection_state);

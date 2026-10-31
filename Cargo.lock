@@ -430,6 +430,7 @@ dependencies = [
  "alvr_filesystem",
  "alvr_packets",
  "alvr_session",
+ "alvr_sockets",
  "cpal",
  "dirs",
  "encoding_rs_io",

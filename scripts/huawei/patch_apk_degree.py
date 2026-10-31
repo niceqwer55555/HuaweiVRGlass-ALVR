@@ -8,13 +8,26 @@ session types) is longer, which means the binary XML string pool has to be
 rebuilt: offsets, chunk sizes and the overall document size all change.
 
 Usage:
-    python patch_apk_degree.py <source.apk> <dest.apk> [<value>]
+    python patch_apk_degree.py <source.apk> <dest.apk> [<value>] [--native <libalvr_client_openxr.so>]
 
 Default value: 3dof|6dof
+
+--native additionally swaps lib/armeabi-v7a/libalvr_client_openxr.so for the
+given file (stored uncompressed, like aapt2 requires for extractNativeLibs=false)
+and drops stale signature files, so one call does the whole repackage.
 """
+import argparse
 import struct
 import sys
 import zipfile
+
+NATIVE_ENTRY = "lib/armeabi-v7a/libalvr_client_openxr.so"
+
+# applicationId 与桌面图标的原始取值；--rename-package / --label 按整串精确替换。
+# dex 里的类名（如 com.lht.huaweivr.alvr.HuaweiVrActivity）是别的池字符串，不会被动到，
+# 所以 JNI 符号（Java_com_lht_huaweivr_alvr_...）依旧有效。
+BASE_PACKAGE = "com.lht.huaweivr.alvr"
+BASE_LABEL = "华为 VR Glass 串流"
 
 RES_STRING_POOL_TYPE = 0x0001
 RES_XML_TYPE = 0x0003
@@ -171,17 +184,65 @@ def patch_manifest(manifest, value):
 
 
 def main():
-    if len(sys.argv) < 3:
-        raise SystemExit(__doc__)
-    src, dst = sys.argv[1], sys.argv[2]
-    value = sys.argv[3] if len(sys.argv) > 3 else "3dof|6dof"
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("src")
+    parser.add_argument("dst")
+    parser.add_argument("value", nargs="?", default="3dof|6dof")
+    parser.add_argument("--native", help="replace the client .so with this file")
+    parser.add_argument(
+        "--rename-package",
+        help="new applicationId; lets a variant install next to the base app",
+    )
+    parser.add_argument("--label", help="new launcher label for this variant")
+    args = parser.parse_args()
 
-    with zipfile.ZipFile(src) as zin:
+    native = None
+    if args.native:
+        with open(args.native, "rb") as f:
+            native = f.read()
+
+    replacements = {}
+    if args.rename_package:
+        replacements[BASE_PACKAGE] = args.rename_package
+    if args.label:
+        replacements[BASE_LABEL] = args.label
+
+    with zipfile.ZipFile(args.src) as zin:
         infos = zin.infolist()
         manifest = zin.read("AndroidManifest.xml")
-        patched_manifest, patched = patch_manifest(manifest, value)
+        patched_manifest, patched = patch_manifest(manifest, args.value)
 
-        with zipfile.ZipFile(dst, "w") as zout:
+        if replacements:
+            pool_start = _u16(patched_manifest, 2)
+            strings, flags, chunk_size, style_count, style_data = _parse_string_pool(
+                patched_manifest, pool_start
+            )
+            replaced = 0
+            seen = set()
+            for i, text in enumerate(strings):
+                if text in replacements:
+                    strings[i] = replacements[text]
+                    replaced += 1
+                    seen.add(text)
+            missing = set(replacements) - seen
+            if missing:
+                raise SystemExit(
+                    f"ERROR: strings not found in manifest pool: {missing}"
+                )
+            new_pool = _build_string_pool(strings, flags, style_count, style_data)
+            patched_manifest = (
+                patched_manifest[:pool_start]
+                + new_pool
+                + patched_manifest[pool_start + chunk_size:]
+            )
+            patched_manifest = (
+                patched_manifest[:4]
+                + _p32(len(patched_manifest))
+                + patched_manifest[8:]
+            )
+            print(f"replaced {replaced} string(s): {list(replacements)}")
+
+        with zipfile.ZipFile(args.dst, "w") as zout:
             for info in infos:
                 name = info.filename
                 # v1 signatures die with the rewrite; apksigner adds fresh ones.
@@ -189,26 +250,32 @@ def main():
                     (".SF", ".RSA", ".DSA", ".MF", ".EC")
                 ):
                     continue
-                data = (
-                    patched_manifest
-                    if name == "AndroidManifest.xml"
-                    else zin.read(name)
-                )
+                if name == NATIVE_ENTRY and native is not None:
+                    data = native
+                elif name == "AndroidManifest.xml":
+                    data = patched_manifest
+                else:
+                    data = zin.read(name)
                 new_info = zipfile.ZipInfo(name, date_time=info.date_time)
-                new_info.compress_type = info.compress_type
+                # The .so must stay stored: android:extractNativeLibs="false"
+                # makes PackageManager refuse compressed native libraries.
+                if name == NATIVE_ENTRY and native is not None:
+                    new_info.compress_type = zipfile.ZIP_STORED
+                else:
+                    new_info.compress_type = info.compress_type
                 new_info.external_attr = info.external_attr
                 new_info.create_system = info.create_system
                 zout.writestr(new_info, data)
 
     # Re-read the result: the pool must still parse and carry the new value.
-    with zipfile.ZipFile(dst) as check:
+    with zipfile.ZipFile(args.dst) as check:
         assert check.testzip() is None, "corrupt archive"
         strings, _, _, _, _ = _parse_string_pool(
             check.read("AndroidManifest.xml"), _u16(check.read("AndroidManifest.xml"), 2)
         )
-    assert value in strings, "patched value missing from string pool"
+    assert args.value in strings, "patched value missing from string pool"
 
-    print(f"patched {patched} string(s) -> {value!r}; wrote {dst}")
+    print(f"patched {patched} string(s) -> {args.value!r}; wrote {args.dst}")
 
 
 if __name__ == "__main__":
