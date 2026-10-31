@@ -5,6 +5,7 @@
 - 部署目录：`D:\HuaweiVRGlass_ALVR_Windows_v0.5.0`；`build/end/` = 成品包（server/+client/，见其 README）
 - dashboard 启动读 exe 同目录 `steamvr_path.txt` 持久化 SteamVR 路径；「上次设置的路径」即上条
 - 产物输出：`D:/PY/1/artifacts/`
+- **git push**：`~/.ssh/config` 顶部有全局 `ProxyCommand ... \Git\mingw64\bin\connect`（文件不存在，proxy-start.bat 遗留）→ 直连可用。已给本仓库设 `core.sshCommand="ssh -F /dev/null -o ProxyCommand=none -i ~/.ssh/id_rsa"`；删掉该仓库配置则会重新报错
 
 ## 构建/工具链（统一 `F:\Tools`，旧路径全作废；`D:\Tools` 为同内容镜像可切）
 - 布局：rust\{cargo,rustup}、msvc MSVC 14.44、Windows Kits 10.0.26100.0、LLVM 18.1.8、AndroidSDK(ndk 26.1.10909125)、nodejs/python/go/mingw64；JDK17 在 `F:\Download\jdk17\jdk-17.0.17+10`
