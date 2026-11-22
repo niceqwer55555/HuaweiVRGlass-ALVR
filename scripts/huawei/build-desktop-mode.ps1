@@ -70,7 +70,7 @@ $ini = Join-Path $OutDir 'desktop_mode.ini'
 if (-not (Test-Path -LiteralPath $ini -PathType Leaf)) {
     @'
 [general]
-enabled=1
+enabled=0
 
 [display]
 monitor=0

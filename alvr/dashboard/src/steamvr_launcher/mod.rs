@@ -288,11 +288,24 @@ fn glasses_edid_keywords() -> Vec<String> {
 fn apply_auto_driver_selection() {
     let mode = connection_mode();
 
-    // Explicit choices bypass ALL detection: if the user wrote `usb`, they
-    // accept responsibility for having the assistant running; if `adb`, ALVR
-    // must win even though the glasses happen to be a DP monitor on this PC.
+    // `adb` is explicit: ALVR must win even though the glasses are a DP monitor.
+    // `usb` is a REQUEST for official wired mode, but that driver physically
+    // cannot init without the Huawei assistant owning the glasses' USB/DP link
+    // (pNumDisplay=0 / Init_HmdNotFound). Honour the request only when the
+    // assistant is actually running; otherwise keep ALVR so SteamVR still has
+    // a usable HMD. `auto` delegates to the same readiness-aware selector.
     let result = match mode {
-        ConnectionMode::Usb => alvr_server_io::select_driver(true).map(|_| Some("huaweiVR")),
+        ConnectionMode::Usb => {
+            if alvr_server_io::is_huawei_assistant_running() {
+                alvr_server_io::select_driver(true).map(|_| Some("huaweiVR"))
+            } else {
+                warn!(
+                    "vr_mode=usb requested but Huawei assistant is not running; \
+                     the official driver would fail with HmdNotFound. Keeping ALVR."
+                );
+                alvr_server_io::select_driver(false).map(|_| Some("alvr_server"))
+            }
+        }
         ConnectionMode::Adb => alvr_server_io::select_driver(false).map(|_| Some("alvr_server")),
         ConnectionMode::Auto => {
             let keywords = glasses_edid_keywords();

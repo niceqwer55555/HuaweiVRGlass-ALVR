@@ -982,7 +982,9 @@ static int RunDesktopMode() {
     std::string err;
     if (!g_gfx.Create("", &err)) {
         DmLog("图形初始化失败：%s", err.c_str());
-        MessageBoxW(NULL, L"图形初始化失败", L"桌面模式", MB_ICONERROR);
+        // No MessageBox: this exe is launched by the ALVR dashboard. A modal
+        // dialog would block the user with no visible parent window. The error
+        // is already logged above; the dashboard shows the log path.
         return 1;
     }
     if (g_st.outputEnabled) {
@@ -997,7 +999,8 @@ static int RunDesktopMode() {
         }
         if (!ok) {
             DmLog("输出窗口创建失败：%s", err.c_str());
-            MessageBoxW(NULL, L"找不到眼镜显示器（需要先把它设为扩展屏）", L"桌面模式", MB_ICONERROR);
+            // No MessageBox: launched headless by the dashboard. Log only;
+            // the dashboard reads desktop_mode.log and reports the failure.
             return 1;
         }
     } else {
@@ -1443,8 +1446,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR cmdline, int) {
     }
     HANDLE once = CreateMutexW(NULL, TRUE, L"HwVRDesktop_SingleInstance");
     if (once && GetLastError() == ERROR_ALREADY_EXISTS) {
-        MessageBoxW(NULL, L"桌面模式已经在运行了。\n（如果屏上是黑的，先把旧的那个关掉：任务管理器结束 HwVRDesktop.exe）",
-                    L"桌面模式", MB_ICONINFORMATION);
+        // No MessageBox: just log and exit quietly. The dashboard checks
+        // renderer_running() before spawning and shows the status in its UI.
+        DmLog("桌面模式已在运行，跳过本次启动");
+        if (g_logf) { fflush(g_logf); }
         return 0;
     }
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);

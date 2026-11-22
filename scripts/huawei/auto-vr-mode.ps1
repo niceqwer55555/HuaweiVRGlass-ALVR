@@ -317,8 +317,17 @@ function Decide-Mode {
     if ($Explicit -and $Explicit -ne 'auto') {
         $chosen = $Explicit
         $reason = "forced by -Mode $Explicit"
+        # A forced `usb` still cannot work without the assistant: the official
+        # driver fails with HmdNotFound and SteamVR ends up with no HMD. Fall
+        # back to adb so SteamVR stays usable (dashboard does the same).
+        if ($chosen -eq 'usb' -and $assistant.Count -eq 0) {
+            Write-Host "  WARNING: -Mode usb but Huawei assistant is not running; official driver cannot init." -ForegroundColor Yellow
+            Write-Host "           Falling back to 'adb' so SteamVR has a usable HMD." -ForegroundColor Yellow
+            $chosen = 'adb'
+            $reason = 'usb requested but assistant absent -> adb fallback'
+        }
         if ($detected -and $detected -ne $chosen) {
-            Write-Host "  NOTE: hardware suggests '$detected' but -Mode forces '$chosen'." -ForegroundColor Yellow
+            Write-Host "  NOTE: hardware suggests '$detected' but mode is '$chosen'." -ForegroundColor Yellow
         }
     } elseif ($detected) {
         $chosen = $detected

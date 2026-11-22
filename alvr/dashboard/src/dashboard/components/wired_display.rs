@@ -303,6 +303,14 @@ impl WiredDisplayTab {
             .fill(palette.surface)
             .show(ui, |ui| {
                 ui.label(RichText::new("启动 / 停止").size(16.0).strong());
+                ui.label(
+                    RichText::new(
+                        "桌面模式默认关闭：它和 SteamVR 抢同一块眼镜屏，两者只能开一个。\
+                         启动时会自动停掉 SteamVR；要用串流请点「停止桌面模式」再从设备页启动 SteamVR。",
+                    )
+                    .size(11.0)
+                    .color(palette.muted_foreground),
+                );
                 ui.horizontal(|ui| {
                     if ui
                         .add_enabled(renderer_ready && glasses.is_some(), egui::Button::new("启动桌面模式"))
@@ -316,7 +324,7 @@ impl WiredDisplayTab {
                     ui.label(
                         RichText::new(format!(
                             "状态：{}",
-                            if Self::renderer_running() { "运行中" } else { "未运行" }
+                            if Self::renderer_running() { "运行中" } else { "未运行（默认）" }
                         ))
                         .weak(),
                     );
@@ -396,6 +404,23 @@ impl WiredDisplayTab {
         if let Some((ok, message)) = &self.status {
             ui.add_space(8.0);
             ui.colored_label(if *ok { palette.ok } else { palette.error }, message);
+        }
+
+        // The renderer logs errors instead of showing a modal dialog (it is a
+        // child process of the dashboard). Surface the last log lines here so
+        // a failed start is diagnosable without opening files manually.
+        if let Some(dir) = renderer_dir() {
+            let log_path = dir.join("desktop_mode.log");
+            if let Ok(text) = fs::read_to_string(&log_path) {
+                let lines: Vec<&str> = text.lines().rev().take(5).collect();
+                if !lines.is_empty() {
+                    ui.add_space(6.0);
+                    ui.label(RichText::new("渲染器日志（最近 5 行）：").weak().size(11.0));
+                    for line in lines.iter().rev() {
+                        ui.label(RichText::new(*line).weak().size(10.0));
+                    }
+                }
+            }
         }
     }
 }
