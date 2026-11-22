@@ -160,6 +160,12 @@ pub fn ensure_openvr_paths_file(runtime_root: &Path) -> Result<PathBuf> {
             "external_drivers".to_owned(),
             json::Value::Array(Vec::new()),
         );
+    }
+
+    // The Steam client rewrites openvrpaths.vrpath and can drop the `apps`
+    // array entirely. Always make sure it exists so manifest registration has
+    // somewhere to go, without touching any already-registered entries.
+    if object.get("apps").is_none() {
         object.insert("apps".to_owned(), json::Value::Array(Vec::new()));
     }
 

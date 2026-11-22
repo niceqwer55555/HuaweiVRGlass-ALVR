@@ -10,7 +10,12 @@ use std::{
 };
 
 const REFRESH_INTERVAL: Duration = Duration::from_secs(5);
-const STEAMVR_BOOT_DELAY: Duration = Duration::from_secs(4);
+/// How long to wait for vrserver to appear before giving up on a cold launch.
+const STEAMVR_BOOT_TIMEOUT: Duration = Duration::from_secs(60);
+/// Poll interval while waiting for SteamVR to become ready.
+const STEAMVR_POLL_INTERVAL: Duration = Duration::from_millis(500);
+/// Extra grace after vrserver appears so the OpenVR session is fully created.
+const STEAMVR_SESSION_GRACE: Duration = Duration::from_secs(2);
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum PickMode {
@@ -301,12 +306,43 @@ impl GameLibraryTab {
     /// without a Steam client installation. Returns an error message when the
     /// runtime cannot be located.
     fn ensure_standalone_config(&self) -> std::result::Result<PathBuf, String> {
-        let runtime_root =
-            crate::steamvr_launcher::resolve_steamvr_runtime_root(&self.steamvr_path)
-                .ok_or("未找到 SteamVR 运行时，请先在上方设置 SteamVR 启动路径")?;
+        let runtime_root = self.runtime_root()?;
         alvr_server_io::ensure_openvr_paths_file(&runtime_root).map_err(|err| err.to_string())?;
 
         Ok(runtime_root)
+    }
+
+    /// SteamVR runtime root selected by the user (may be a custom install).
+    fn runtime_root(&self) -> std::result::Result<PathBuf, String> {
+        crate::steamvr_launcher::resolve_steamvr_runtime_root(&self.steamvr_path)
+            .ok_or_else(|| "未找到 SteamVR 运行时，请先在上方设置 SteamVR 启动路径".into())
+    }
+
+    /// Pushes a game's manifest into the SELECTED SteamVR via its own vrcmd.exe,
+    /// so a custom SteamVR path sees the game in its in-headset library. The
+    /// openvrpaths entry is written first (survives restarts); vrcmd is the
+    /// live registration and needs SteamVR running + headset ready, so its
+    /// failure is reported but not fatal.
+    fn register_game(&self, game: &LocalGame) -> std::result::Result<(), String> {
+        let runtime_root = self.ensure_standalone_config()?;
+
+        let manifest = game_library::set_manifest_registered(game, true)
+            .map_err(|err| err.to_string())?;
+
+        // vrcmd needs a live SteamVR session. When it is cold, openvrpaths
+        // already lists the manifest, so the game appears on next launch -
+        // no need to surface a misleading "registration failed" message.
+        if !crate::steamvr_launcher::is_steamvr_running() {
+            return Ok(());
+        }
+
+        match game_library::register_with_steamvr(&runtime_root, game) {
+            Ok(()) => Ok(()),
+            Err(err) => Err(format!(
+                "已写入清单 {}，但实时注册到该 SteamVR 失败：{err}（重启 SteamVR 后仍会生效）",
+                manifest.display()
+            )),
+        }
     }
 
     pub fn ui(&mut self, ui: &mut Ui) {
@@ -448,6 +484,14 @@ impl GameLibraryTab {
                 );
             }
         }
+        ui.label(
+            RichText::new(format!(
+                "有线连接模式：{}（auto=按眼镜 EDID 自动判断；usb=眼镜直插PC官方有线；adb=手机USB+adb串流。用 auto-vr-mode.ps1 -Mode 调整）",
+                crate::steamvr_launcher::selected_connection_mode()
+            ))
+            .size(12.0)
+            .color(theme::palette(ui.ctx()).muted_foreground),
+        );
 
         ui.add_space(6.0);
         ui.horizontal(|ui| {
@@ -566,20 +610,10 @@ impl GameLibraryTab {
                 }
 
                 if self.register_manifest {
-                    let registered = self.ensure_standalone_config().and_then(|_| {
-                        game_library::set_manifest_registered(&game, true)
-                            .map_err(|err| err.to_string())
-                    });
-                    match registered {
-                        Ok(path) => {
-                            let file_name = path
-                                .file_name()
-                                .map(|name| name.to_string_lossy().into_owned())
-                                .unwrap_or_default();
-                            message.push_str(&format!(
-                                "；已注册到 SteamVR 库（{file_name}，重启 SteamVR 后可见）"
-                            ));
-                        }
+                    match self.register_game(&game) {
+                        Ok(()) => message.push_str(
+                            "；已加入 SteamVR 游戏库（该 SteamVR 无需重启即可见）",
+                        ),
                         Err(err) => message.push_str(&format!("；注册 SteamVR 库失败：{err}")),
                     }
                 }
@@ -670,47 +704,72 @@ impl GameLibraryTab {
     }
 
     fn launch(&mut self, game: LocalGame) {
-        // Keep the standalone config and the game manifest in sync so SteamVR
-        // lists the game even without the Steam client. Failures are not
-        // fatal: the game still starts as a plain process.
-        if let Err(err) = self.ensure_standalone_config().and_then(|_| {
-            game_library::set_manifest_registered(&game, true)
-                .map_err(|err| err.to_string())
-        }) {
+        // Keep the standalone config and the selected SteamVR's library in
+        // sync. Failures are not fatal: the game still starts as a plain
+        // process.
+        if let Err(err) = self.register_game(&game) {
             self.set_status(
                 StatusKind::Error,
                 format!("SteamVR 库同步失败（不影响启动游戏）：{err}"),
             );
         }
 
-        let steamvr_running = crate::steamvr_launcher::is_steamvr_running();
-
-        if !steamvr_running {
-            crate::steamvr_launcher::LAUNCHER.lock().launch_steamvr();
-
-            let name = game.name.clone();
-            std::thread::spawn(move || {
-                std::thread::sleep(STEAMVR_BOOT_DELAY);
-                match game_library::launch_game(&game) {
-                    Ok(pid) => alvr_common::info!("Launched {} (pid {})", game.name, pid),
-                    Err(err) => alvr_common::warn!("Failed to launch {}: {err}", game.name),
-                }
-            });
-
-            self.set_status(
-                StatusKind::Ok,
-                format!("SteamVR 未运行，已先启动 SteamVR，约 4 秒后启动「{name}」"),
-            );
+        if crate::steamvr_launcher::is_steamvr_running() {
+            match game_library::launch_game(&game) {
+                Ok(pid) => self.set_status(
+                    StatusKind::Ok,
+                    format!("已启动「{}」（进程 {}）", game.name, pid),
+                ),
+                Err(err) => self.set_status(StatusKind::Error, format!("启动失败：{err}")),
+            }
             return;
         }
 
-        match game_library::launch_game(&game) {
-            Ok(pid) => self.set_status(
-                StatusKind::Ok,
-                format!("已启动「{}」（进程 {}）", game.name, pid),
-            ),
-            Err(err) => self.set_status(StatusKind::Error, format!("启动失败：{err}")),
-        }
+        // SteamVR is cold. A fixed sleep races its startup (vrserver needs to
+        // create the VR session before a game can attach), which is why games
+        // launched "offline" used to fail. Poll until vrserver is really up,
+        // with a bounded timeout, then launch.
+        crate::steamvr_launcher::LAUNCHER.lock().launch_steamvr();
+
+        let name = game.name.clone();
+        let steamvr_path = self.steamvr_path.clone();
+        std::thread::spawn(move || {
+            let deadline = std::time::Instant::now() + STEAMVR_BOOT_TIMEOUT;
+            while std::time::Instant::now() < deadline {
+                if crate::steamvr_launcher::is_steamvr_running() {
+                    // Give the runtime a moment to finish creating the session
+                    // after the vrserver process appears.
+                    std::thread::sleep(STEAMVR_SESSION_GRACE);
+                    match game_library::launch_game(&game) {
+                        Ok(pid) => {
+                            alvr_common::info!("Launched {} (pid {})", game.name, pid);
+                            // With SteamVR now alive, retry the live registration
+                            // that may have failed while it was still booting.
+                            if let Some(root) = crate::steamvr_launcher::resolve_steamvr_runtime_root(
+                                &steamvr_path,
+                            ) {
+                                let _ = game_library::register_with_steamvr(&root, &game);
+                            }
+                        }
+                        Err(err) => {
+                            alvr_common::warn!("Failed to launch {}: {err}", game.name)
+                        }
+                    }
+                    return;
+                }
+                std::thread::sleep(STEAMVR_POLL_INTERVAL);
+            }
+            alvr_common::warn!(
+                "SteamVR did not become ready within {:?}; not launching {}",
+                STEAMVR_BOOT_TIMEOUT,
+                game.name
+            );
+        });
+
+        self.set_status(
+            StatusKind::Ok,
+            format!("SteamVR 未运行，已启动；待其就绪后自动启动「{name}」"),
+        );
     }
 
     fn steam_shortcuts_section(&mut self, ui: &mut Ui) {

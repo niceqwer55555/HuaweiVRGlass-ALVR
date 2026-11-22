@@ -155,22 +155,31 @@ pub fn manifest_path(game: &LocalGame) -> Option<PathBuf> {
 }
 
 /// Builds the manifest body. `SteamVR` only accepts the official layout: a top
-/// level `applications` array and the display name under
-/// `strings.en_us.name` (see SteamVR's own `tools.vrmanifest`).
+/// level `applications` array, a `source` field and the display name under
+/// `strings.en_us.name` (see SteamVR's own `tools.vrmanifest` and the manifest
+/// produced by the Steam client).
+///
+/// `source: external` is required: the SteamVR AppInfoManager skips manifests
+/// without it, which is why an otherwise valid manifest never shows up in the
+/// in-headset library. Paths are always absolute - SteamVR resolves them
+/// relative to the manifest otherwise and rejects an invalid working
+/// directory with "Working directory ... is invalid. Skipping".
 fn manifest_json(game: &LocalGame, app_key: &str, exe: &Path) -> serde_json::Value {
-    let working_dir = exe
+    let exe_abs = absolute_path(exe);
+    let working_dir = exe_abs
         .parent()
-        .map(|parent| parent.display().to_string())
-        .unwrap_or_default();
+        .map(absolute_path)
+        .unwrap_or_else(|| exe_abs.clone());
 
     serde_json::json!({
+        "source": "external",
         "applications": [
             {
                 "app_key": app_key,
                 "launch_type": "binary",
-                "binary_path_windows": exe.display().to_string(),
+                "binary_path_windows": exe_abs.display().to_string(),
                 "arguments": game.args.clone(),
-                "working_directory": working_dir,
+                "working_directory": working_dir.display().to_string(),
                 "image_path": "",
                 "strings": {
                     "en_us": {
@@ -180,6 +189,22 @@ fn manifest_json(game: &LocalGame, app_key: &str, exe: &Path) -> serde_json::Val
             }
         ],
     })
+}
+
+/// Returns an absolute, normalized path without requiring the file to exist.
+/// `canonicalize()` is preferred (it also resolves `..` and symlinks), with a
+/// `current_dir().join()` fallback for paths that do not exist yet.
+fn absolute_path(path: &Path) -> PathBuf {
+    if let Ok(canonical) = path.canonicalize() {
+        return canonical;
+    }
+    if path.is_absolute() {
+        return path.to_path_buf();
+    }
+    match std::env::current_dir() {
+        Ok(cwd) => cwd.join(path),
+        Err(_) => path.to_path_buf(),
+    }
 }
 
 /// Writes the SteamVR manifest for `game`. Returns the manifest path.
@@ -217,6 +242,43 @@ pub fn set_manifest_registered(game: &LocalGame, register: bool) -> Result<PathB
         alvr_server_io::set_app_manifest_registered(&path, false)?;
         Ok(path)
     }
+}
+
+/// Registers the game's manifest with ONE specific SteamVR installation using
+/// its own `vrcmd.exe --appmanifest` (the CLI wrapper for
+/// `IVRApplications::AddApplicationManifest`). This is what makes a custom
+/// SteamVR path pick the game up without touching the Steam client.
+///
+/// `runtime_root` must be the SteamVR runtime root (the folder containing
+/// `bin/win64/vrmonitor.exe`). Everything else is derived from it, so no drive
+/// letter or install location is baked in. Registration needs a running
+/// vrserver with a headset ready; callers should start SteamVR first and treat
+/// a failure as non-fatal (openvrpaths still lists the game on next launch).
+pub fn register_with_steamvr(runtime_root: &Path, game: &LocalGame) -> Result<()> {
+    let vrcmd = runtime_root.join("bin").join("win64").join("vrcmd.exe");
+    if !vrcmd.is_file() {
+        bail!("该 SteamVR 目录下找不到 vrcmd.exe：{}", vrcmd.display());
+    }
+
+    let path = write_manifest(game)?;
+
+    let output = Command::new(&vrcmd)
+        .arg("--appmanifest")
+        .arg(&path)
+        .output()
+        .with_context(|| format!("无法执行 {}", vrcmd.display()))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if !output.status.success() {
+        let detail = format!("{}{}", stdout, stderr);
+        bail!(
+            "SteamVR 注册失败（需先启动 SteamVR 并连好头显）：{}",
+            detail.trim()
+        );
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -264,6 +326,7 @@ mod tests {
         let value = manifest_json(&game, "local.beat-saber", Path::new(&game.exe));
 
         let app = &value["applications"][0];
+        assert_eq!(value["source"], "external", "SteamVR skips manifests without source");
         assert_eq!(app["app_key"], "local.beat-saber");
         assert_eq!(app["launch_type"], "binary");
         assert_eq!(
