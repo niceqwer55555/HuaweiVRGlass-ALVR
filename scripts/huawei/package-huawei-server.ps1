@@ -18,7 +18,7 @@
 [CmdletBinding()]
 param(
     [string]$DashboardExe = (Join-Path $PSScriptRoot '..\..\build\target\release\alvr_dashboard.exe'),
-    [string]$TemplateDir = 'D:\HuaweiVRGlass_ALVR_Windows_v0.5.0',
+    [string]$TemplateDir = '',
     [string]$OutputDir = (Join-Path $PSScriptRoot '..\..\build\end\server'),
     [string]$Archive = (Join-Path $PSScriptRoot '..\..\build\end\server.7z'),
     [string]$SevenZip,
@@ -36,6 +36,29 @@ function Resolve-RepoPath {
     return [System.IO.Path]::GetFullPath((Join-Path $repoRoot $Path))
 }
 
+# No hardcoded install path: look for a usable server/deployment folder in
+# priority order. Override with -TemplateDir for any other location.
+function Find-TemplateDir {
+    param([string]$Exclude)
+    $candidates = @(
+        'D:\PY\1\artifacts\HuaweiVRGlass-ALVR-Windows-v20.14.1',
+        'D:\HuaweiVRGlass_ALVR_Windows_v0.5.0',
+        (Join-Path $repoRoot 'build\end\server')
+    )
+    foreach ($candidate in $candidates) {
+        if (-not $candidate) { continue }
+        try {
+            $resolved = [System.IO.Path]::GetFullPath($candidate)
+        } catch { continue }
+        if ($Exclude -and $resolved.TrimEnd('\') -ieq $Exclude.TrimEnd('\')) { continue }
+        if ((Test-Path -LiteralPath (Join-Path $resolved 'bin\win64\driver_alvr_server.dll') -PathType Leaf) -and
+            (Test-Path -LiteralPath (Join-Path $resolved 'driver.vrdrivermanifest') -PathType Leaf)) {
+            return $resolved
+        }
+    }
+    return $null
+}
+
 $dashboardExe = Resolve-RepoPath $DashboardExe
 $outputDir = Resolve-RepoPath $OutputDir
 $archive = Resolve-RepoPath $Archive
@@ -43,8 +66,9 @@ $archive = Resolve-RepoPath $Archive
 if (-not (Test-Path -LiteralPath $dashboardExe -PathType Leaf)) {
     throw "dashboard executable not found: $dashboardExe"
 }
-if (-not (Test-Path -LiteralPath $TemplateDir -PathType Container)) {
-    throw "template (deployment) folder not found: $TemplateDir"
+if (-not $TemplateDir) { $TemplateDir = Find-TemplateDir -Exclude $outputDir }
+if (-not $TemplateDir -or -not (Test-Path -LiteralPath $TemplateDir -PathType Container)) {
+    throw "template (deployment) folder not found; pass -TemplateDir <dir>"
 }
 
 # --- 7-Zip -----------------------------------------------------------------
@@ -65,9 +89,29 @@ Write-Host "output   : $outputDir"
 Write-Host "dashboard: $dashboardExe"
 
 New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
-Get-ChildItem -LiteralPath $TemplateDir -Force | ForEach-Object {
-    Copy-Item -LiteralPath $_.FullName -Destination $outputDir -Recurse -Force
+# Skip debug symbols, backups and logs - useless in a distributable package
+# and responsible for most of the size (a stale .pdb alone is ~50 MB).
+$excludedNames = @(
+    '*.pdb', '*.bak', '*.bak_*', 'crash_log.txt', 'session_invalid.json',
+    '*.7z', '*.zip'
+)
+function Copy-TemplateTree {
+    param([string]$Source, [string]$Destination)
+    New-Item -ItemType Directory -Path $Destination -Force | Out-Null
+    foreach ($item in (Get-ChildItem -LiteralPath $Source -Force)) {
+        $skip = $false
+        foreach ($pattern in $excludedNames) {
+            if ($item.Name -like $pattern) { $skip = $true; break }
+        }
+        if ($skip) { continue }
+        if ($item.PSIsContainer) {
+            Copy-TemplateTree -Source $item.FullName -Destination (Join-Path $Destination $item.Name)
+        } else {
+            Copy-Item -LiteralPath $item.FullName -Destination $Destination -Force
+        }
+    }
 }
+Copy-TemplateTree -Source $TemplateDir -Destination $outputDir
 Copy-Item -LiteralPath $dashboardExe -Destination (Join-Path $outputDir 'ALVR Dashboard.exe') -Force
 
 # --- Repack ----------------------------------------------------------------

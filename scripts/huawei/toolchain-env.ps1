@@ -28,9 +28,10 @@
         $env:JAVA_HOME         -> JDK root
 #>
 
-# Preferred root first. F:\Tools is the full mirror of D:\Tools and is the one
-# currently in use; the others are fallbacks after a drive change.
-$script:VrDefaultToolsRoots = @('F:\Tools', 'D:\Tools', 'C:\Tools')
+# Preferred root first. D:\Tools is the primary dev environment; the others
+# are fallbacks (F:\Tools is a mirror) after a drive change. Override with
+# TOOLS_ROOT / toolchain-paths.json instead of editing this list.
+$script:VrDefaultToolsRoots = @('D:\Tools', 'F:\Tools', 'C:\Tools')
 
 # Optional overrides file. Copy toolchain-paths.example.json and edit if the
 # environment lives somewhere else.
