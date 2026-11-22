@@ -312,7 +312,16 @@ function Decide-Mode {
     if ($glasses.Found -and -not $wiredReady) {
         Write-Host "  NOTE: glasses on PC but Huawei assistant not running -> official wired cannot init." -ForegroundColor Yellow
     }
-    $detected = if ($wiredReady) { 'usb' } elseif ($phones.Phones.Count -gt 0) { 'adb' } else { $null }
+    # Even when the glasses are on the PC (DP visible) but the assistant is
+    # absent, ALVR is still the usable path: keep SteamVR alive with `adb`
+    # instead of reporting "nothing detected". This mirrors the Rust selector.
+    $detected = if ($wiredReady) {
+        'usb'
+    } elseif ($glasses.Found -or $phones.Phones.Count -gt 0) {
+        'adb'
+    } else {
+        $null
+    }
 
     if ($Explicit -and $Explicit -ne 'auto') {
         $chosen = $Explicit
