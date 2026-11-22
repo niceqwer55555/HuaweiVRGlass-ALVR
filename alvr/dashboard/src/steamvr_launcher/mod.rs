@@ -196,6 +196,52 @@ fn unblock_alvr_driver_within_vrsettings(text: &str) -> Result<String> {
 /// comma separated). When it is missing the built-in list is used.
 const GLASSES_EDID_FILE: &str = "glasses_edid.txt";
 
+/// Sidecar file next to the dashboard executable. One of `auto`, `usb`, `adb`.
+/// `usb` = glasses docked to the PC -> official wired driver; `adb` = glasses
+/// on the phone linked by USB adb -> ALVR driver; `auto` (or missing) keeps the
+/// EDID-based detection. Written by scripts/huawei/auto-vr-mode.ps1 so an
+/// explicit choice survives the next SteamVR start (otherwise the automatic
+/// driver selection would silently overwrite it).
+const VR_MODE_FILE: &str = "vr_mode.txt";
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum ConnectionMode {
+    Auto,
+    Usb,
+    Adb,
+}
+
+/// Reads the user's wired-connection choice. Anything unrecognized (including
+/// a missing file) falls back to `auto`, so upgrading never breaks an install.
+fn connection_mode() -> ConnectionMode {
+    let mut dir = match std::env::current_exe() {
+        Ok(dir) => dir,
+        Err(_) => return ConnectionMode::Auto,
+    };
+    dir.pop();
+
+    let Ok(text) = fs::read_to_string(dir.join(VR_MODE_FILE)) else {
+        return ConnectionMode::Auto;
+    };
+
+    match text.trim().trim_matches('"').to_ascii_lowercase().as_str() {
+        // Aliases accepted so the file can hold either the connection kind or
+        // the driver name used by switch-vr-driver.ps1.
+        "usb" | "wired" | "huawei" => ConnectionMode::Usb,
+        "adb" | "phone" | "alvr" => ConnectionMode::Adb,
+        _ => ConnectionMode::Auto,
+    }
+}
+
+/// Connection mode currently in effect, for the UI to display.
+pub fn selected_connection_mode() -> &'static str {
+    match connection_mode() {
+        ConnectionMode::Auto => "auto",
+        ConnectionMode::Usb => "usb",
+        ConnectionMode::Adb => "adb",
+    }
+}
+
 /// The glasses are a plain DisplayPort panel, so they are identified by the
 /// monitor EDID they report. `RTK2560` is the Realtek bridge inside the HUAWEI
 /// VR Glass; the rest are fallbacks for other reports.
@@ -240,15 +286,25 @@ fn glasses_edid_keywords() -> Vec<String> {
 /// SteamVR reads the enable flags while starting up, so this must run before it
 /// is launched.
 fn apply_auto_driver_selection() {
-    let keywords = glasses_edid_keywords();
-    let glasses_on_pc = alvr_server_io::is_glasses_attached_to_pc(&keywords);
+    let mode = connection_mode();
+    // An explicit `usb`/`adb` choice wins: the user may have both cables
+    // attached, or EDID may fail to identify the glasses. Only `auto` consults
+    // the hardware, so a manual selection is never overwritten on restart.
+    let glasses_on_pc = match mode {
+        ConnectionMode::Usb => true,
+        ConnectionMode::Adb => false,
+        ConnectionMode::Auto => {
+            let keywords = glasses_edid_keywords();
+            alvr_server_io::is_glasses_attached_to_pc(&keywords)
+        }
+    };
 
     match alvr_server_io::apply_auto_driver_selection(glasses_on_pc) {
-        Ok(Some(winner)) => {
-            debug!("Auto driver selection: using {winner} (glasses on PC: {glasses_on_pc})")
-        }
-        Ok(None) => debug!("Auto driver selection: skipped, no Huawei driver registered"),
-        Err(err) => warn!("Auto driver selection failed: {err:?}"),
+        Ok(Some(winner)) => debug!(
+            "Driver selection: using {winner} (mode {mode:?}, glasses on PC: {glasses_on_pc})"
+        ),
+        Ok(None) => debug!("Driver selection: skipped, no Huawei driver registered"),
+        Err(err) => warn!("Driver selection failed: {err:?}"),
     }
 
     // The phone normally is NOT on USB (its port is taken by the glasses), so

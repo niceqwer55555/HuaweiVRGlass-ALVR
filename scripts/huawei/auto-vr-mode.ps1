@@ -1,50 +1,85 @@
 #requires -Version 5.1
 <#
-Auto-VRMode.ps1 - pick the HMD driver from what is actually plugged in.
+Auto-VRMode.ps1 - pick how the HMD is connected, then let SteamVR use the
+matching driver. Two independent wired paths are supported:
 
-Policy
-------
-  phone on USB (visible to adb)  ->  alvr    (glasses on phone, stream over USB)
-  no phone on USB                ->  huawei  (glasses on PC, official wired)
+  usb   - glasses docked straight into the PC (USB-C DP alt-mode), official
+          HUAWEI wired driver. Detected by monitor EDID (e.g. DISPLAY\RTK2560).
+  adb   - glasses on the phone, phone linked to the PC over USB with adb; ALVR
+          streams to the phone. Detected by an adb device with a usb transport.
 
-Rationale: the glasses have a single USB-C port. If a phone is wired to the PC,
-the glasses are on the phone, so official wired mode is physically impossible and
-ALVR must win. If no phone is present, the glasses are assumed to be on the PC and
-the official driver should win.
-
-This script only decides and applies the driver enable flags; the actual switching
-is delegated to switch-vr-driver.ps1 in the same folder.
+There is also auto mode: read the EDID and adb signals together and decide.
+Because both cables can be attached at once (and EDID can be ambiguous), -Mode
+lets you force a choice. The choice is persisted in vr_mode.txt next to the
+dashboard executable, so the dashboard's own driver selection will not undo it.
 
 Usage
 -----
-    .\auto-vr-mode.ps1              # detect, switch, print what to do next
-    .\auto-vr-mode.ps1 -Status      # detect and report only, change nothing
-    .\auto-vr-mode.ps1 -Launch      # switch, then start the matching stack
-    .\auto-vr-mode.ps1 -Watch       # keep running, re-evaluate as you plug/unplug
+    .\auto-vr-mode.ps1                    # auto: detect both signals, switch
+    .\auto-vr-mode.ps1 -Mode usb          # force official wired (glasses on PC)
+    .\auto-vr-mode.ps1 -Mode adb          # force ALVR (phone on USB adb)
+    .\auto-vr-mode.ps1 -Mode auto         # explicit auto
+    .\auto-vr-mode.ps1 -Status            # detect + report only, change nothing
+    .\auto-vr-mode.ps1 -Launch            # switch, then start the matching stack
+    .\auto-vr-mode.ps1 -Watch             # re-evaluate on plug/unplug
     .\auto-vr-mode.ps1 -Watch -Launch -Interval 3
 
-    -AdbPath <exe>    use a specific adb.exe instead of auto-detecting
-    -Interval <sec>   polling interval for -Watch (default 5)
+    -AdbPath <exe>          use a specific adb.exe instead of auto-detecting
+    -DashboardDir <dir>     where to write vr_mode.txt (default: auto-detect)
+    -EdidKeywords a,b       override the glasses EDID keywords
+    -Interval <sec>         -Watch polling interval (default 5)
 
 Notes
 -----
-* "Phone on USB" means adb reports it with a usb: transport. A phone reachable
-  only over WiFi (ip:5555) does NOT count - official wired stays selectable then.
-* An unauthorized phone (USB debugging not confirmed) is reported as a warning and
-  treated as absent, because ALVR would not be able to drive it anyway.
-* SteamVR is stopped before the flags are edited (vrserver rewrites them on exit).
+* WriteAllText uses UTF-8 without BOM - vr_mode.txt is read by Rust.
+* SteamVR is stopped before the flags are edited (vrserver rewrites them on
+  exit). The actual flag switch is delegated to switch-vr-driver.ps1.
 #>
-
+[CmdletBinding()]
 param(
+    [ValidateSet('auto', 'usb', 'adb')]
+    [string]$Mode = 'auto',
     [switch]$Status,
     [switch]$Launch,
     [switch]$Watch,
     [int]$Interval = 5,
-    [string]$AdbPath
+    [string]$AdbPath,
+    [string]$DashboardDir,
+    [string]$EdidKeywords
 )
 
 $ErrorActionPreference = 'Stop'
 $switchScript = Join-Path $PSScriptRoot 'switch-vr-driver.ps1'
+$modeFile = 'vr_mode.txt'
+
+# ------------------------------------------------------------------ helpers
+function Write-TextFile {
+    param([string]$Path, [string]$Text)
+    $parent = Split-Path -Parent $Path
+    if ($parent -and -not (Test-Path -LiteralPath $parent)) {
+        New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    }
+    [IO.File]::WriteAllText($Path, $Text, (New-Object Text.UTF8Encoding($false)))
+}
+
+function Get-EdidKeywordList {
+    if ($EdidKeywords) {
+        return @($EdidKeywords -split '[,\r\n]' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    }
+    # Same defaults as Rust (steamvr_launcher/mod.rs DEFAULT_GLASSES_KEYWORDS).
+    $result = @('RTK2560', 'HUAWEI', 'VRGLASS', 'VR GLASS')
+    if ($DashboardDir) {
+        $f = Join-Path $DashboardDir 'glasses_edid.txt'
+        if (Test-Path -LiteralPath $f) {
+            try {
+                $custom = @((Get-Content -LiteralPath $f -Raw) -split '[,\r\n]' |
+                            ForEach-Object { $_.Trim() } | Where-Object { $_ })
+                if ($custom.Count -gt 0) { return $custom }
+            } catch {}
+        }
+    }
+    return $result
+}
 
 # ------------------------------------------------------------------ adb lookup
 function Find-Adb {
@@ -83,66 +118,141 @@ function Get-UsbPhones {
     $result = @{ Phones = @(); Unauthorized = @(); Raw = @() }
     if (-not $Adb) { return $result }
 
-    # stdout only: adb logs daemon startup / transport noise to stderr, which
-    # would otherwise pollute the device list (and trip ErrorActionPreference).
+    # stdout only: adb logs daemon startup / transport noise to stderr
     $prev = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try { $out = & $Adb devices -l 2>$null | Out-String } finally { $ErrorActionPreference = $prev }
 
     foreach ($line in ($out -split "`r?`n")) {
-        # skip anything that is not a "<serial> <state> ..." line
         $line = $line.Trim()
         if (-not $line) { continue }
         if ($line -like 'List of devices*') { continue }
         if ($line -like '*daemon*') { continue }
-        if ($line -notmatch '^[A-Za-z0-9._:-]+\s+\S') { continue }   # not a device row
+        if ($line -notmatch '^[A-Za-z0-9._:-]+\s+\S') { continue }
         $result.Raw += $line
 
         if ($line -match '^(\S+)\s+unauthorized') {
             $result.Unauthorized += $Matches[1]
             continue
         }
-        # state must be "device" and transport must be USB
         if ($line -match '^(\S+)\s+device\b') {
-            $serial = $Matches[1]     # grab it before any later -match resets $Matches
+            $serial = $Matches[1]
             if ($line -match '\busb:') { $result.Phones += $serial }
         }
     }
     return $result
 }
 
+# --------------------------------------------------------- glasses-on-PC (EDID)
+function Get-GlassesOnPc {
+    param([string[]]$Keywords)
+
+    $ids = New-Object System.Collections.ArrayList
+    # Monitor PnP device ids: DISPLAY\RTK2560\5&....
+    try {
+        $pnp = @(Get-CimInstance Win32_PnPEntity -ErrorAction SilentlyContinue |
+                 Where-Object { $_.PNPDeviceID -like 'DISPLAY\*' })
+        foreach ($p in $pnp) {
+            [void]$ids.Add(("$($p.PNPDeviceID) $($p.Name)"))
+        }
+    } catch {}
+    # WMI EDID monitor instance names
+    try {
+        $mon = @(Get-CimInstance -Namespace root\wmi -ClassName WmiMonitorBasicDisplayParams -ErrorAction SilentlyContinue)
+        foreach ($m in $mon) { [void]$ids.Add([string]$m.InstanceName) }
+    } catch {}
+
+    foreach ($id in $ids) {
+        if (-not $id) { continue }
+        $upper = $id.ToUpperInvariant()
+        foreach ($k in $Keywords) {
+            if ($k -and $upper.Contains($k.ToUpperInvariant())) {
+                return [pscustomobject]@{ Found = $true; Match = $id }
+            }
+        }
+    }
+    return [pscustomobject]@{ Found = $false; Match = '' }
+}
+
+# ------------------------------------------------------------- dashboard dir
+function Find-DashboardDir {
+    if ($DashboardDir -and (Test-Path -LiteralPath $DashboardDir -PathType Container)) {
+        return [IO.Path]::GetFullPath($DashboardDir)
+    }
+    $candidates = New-Object System.Collections.ArrayList
+    $vrpathFile = Join-Path $env:LOCALAPPDATA 'openvr\openvrpaths.vrpath'
+    if (Test-Path -LiteralPath $vrpathFile) {
+        try {
+            $vp = Get-Content -LiteralPath $vrpathFile -Raw | ConvertFrom-Json
+            foreach ($d in $vp.external_drivers) {
+                if (-not $d) { continue }
+                $d = $d.TrimEnd('\')
+                [void]$candidates.Add($d)
+                [void]$candidates.Add((Split-Path -Parent $d))
+            }
+        } catch {}
+    }
+    [void]$candidates.Add((Split-Path -Parent $PSScriptRoot))
+    [void]$candidates.Add((Join-Path (Split-Path -Parent $PSScriptRoot) 'build\end\server'))
+
+    foreach ($c in $candidates) {
+        if (-not $c) { continue }
+        if (Test-Path -LiteralPath (Join-Path $c 'ALVR Dashboard.exe') -PathType Leaf) {
+            return [IO.Path]::GetFullPath($c)
+        }
+    }
+    return $null
+}
+
 # ------------------------------------------------------------- apply + launch
 function Apply-Mode {
-    param([string]$Mode)
+    param([string]$Target)
 
     if (-not (Test-Path -LiteralPath $switchScript)) {
         Write-Host "switch-vr-driver.ps1 not found next to this script: $switchScript" -ForegroundColor Red
         return $false
     }
-    & $switchScript $Mode 2>&1 | Out-String -Width 200 | Write-Host
+    # auto-vr-mode uses connection kinds (usb/adb); the switch script uses
+    # driver names (huawei/alvr).
+    $driver = if ($Target -eq 'usb') { 'huawei' } else { 'alvr' }
+    & $switchScript $driver 2>&1 | Out-String -Width 200 | Write-Host
     return $true
 }
 
+function Persist-Mode {
+    param([string]$Target, [string]$Dir)
+    if (-not $Dir) {
+        Write-Host "WARN: dashboard dir not found; $modeFile not written." -ForegroundColor Yellow
+        Write-Host "      Pass -DashboardDir <dir> so the choice survives SteamVR restart." -ForegroundColor Yellow
+        return
+    }
+    $p = Join-Path $Dir $modeFile
+    Write-TextFile -Path $p -Text "$Target`n"
+    Write-Host "mode persisted: $p ($Target)" -ForegroundColor Green
+}
+
 function Start-VRStack {
-    param([string]$Mode, [string]$Adb)
+    param([string]$Target, [string]$Adb, [string]$Dir)
 
     $vp = Get-Content -LiteralPath (Join-Path $env:LOCALAPPDATA 'openvr\openvrpaths.vrpath') -Raw | ConvertFrom-Json
     $runtime = $vp.runtime | Select-Object -First 1
     $vrmonitor = Join-Path $runtime 'bin\win64\vrmonitor.exe'
 
-    if ($Mode -eq 'alvr') {
-        $alvrDir = $null
-        foreach ($d in $vp.external_drivers) {
-            if (-not $d) { continue }
-            $d = $d.TrimEnd('\')
-            if (Test-Path -LiteralPath (Join-Path $d 'ALVR Dashboard.exe')) { $alvrDir = $d; break }
+    if ($Target -eq 'adb') {
+        $alvrDir = $Dir
+        if (-not $alvrDir) {
+            foreach ($d in $vp.external_drivers) {
+                if (-not $d) { continue }
+                $d = $d.TrimEnd('\')
+                if (Test-Path -LiteralPath (Join-Path $d 'ALVR Dashboard.exe')) { $alvrDir = $d; break }
+            }
         }
         if ($alvrDir) {
             Write-Host "Starting ALVR Dashboard: $alvrDir"
             Start-Process -FilePath (Join-Path $alvrDir 'ALVR Dashboard.exe') -WorkingDirectory $alvrDir | Out-Null
             Start-Sleep -Seconds 3
         } else {
-            Write-Host "ALVR Dashboard.exe not found in any registered driver dir." -ForegroundColor Yellow
+            Write-Host "ALVR Dashboard.exe not found; pass -DashboardDir." -ForegroundColor Yellow
         }
 
         if ($Adb) {
@@ -169,61 +279,88 @@ function Start-VRStack {
 # --------------------------------------------------------------------- main
 $adb = Find-Adb -Preferred $AdbPath
 if ($adb) {
-    Write-Host "adb            : $adb"
+    Write-Host "adb             : $adb"
 } else {
-    Write-Host "adb            : NOT FOUND - USB phone cannot be detected, assuming official wired." -ForegroundColor Yellow
+    Write-Host "adb             : NOT FOUND - USB phone cannot be detected" -ForegroundColor Yellow
 }
 
-function Show-Decision {
-    param([string]$Adb)
+$keywords = Get-EdidKeywordList
+$dashboardDir = Find-DashboardDir
+if ($dashboardDir) { Write-Host "dashboard dir   : $dashboardDir" }
+Write-Host "EDID keywords   : $($keywords -join ', ')"
 
-    $det = Get-UsbPhones $Adb
-    $mode = if ($det.Phones.Count -gt 0) { 'alvr' } else { 'huawei' }
+function Decide-Mode {
+    param([string]$Adb, [string]$Explicit, [string[]]$Kw)
+
+    $phones = Get-UsbPhones $Adb
+    $glasses = Get-GlassesOnPc $Kw
 
     Write-Host ""
-    Write-Host "phone on USB   : $(if ($det.Phones.Count -gt 0) { $det.Phones -join ', ' } else { 'none' })"
-    if ($det.Unauthorized.Count -gt 0) {
-        Write-Host "  WARNING unauthorized (confirm USB debugging on phone): $($det.Unauthorized -join ', ')" -ForegroundColor Yellow
+    Write-Host "phone on USB adb: $(if ($phones.Phones.Count -gt 0) { $phones.Phones -join ', ' } else { 'none' })"
+    if ($phones.Unauthorized.Count -gt 0) {
+        Write-Host "  WARNING unauthorized (confirm USB debugging): $($phones.Unauthorized -join ', ')" -ForegroundColor Yellow
     }
-    if ($det.Phones.Count -eq 0 -and $det.Raw.Count -gt 0) {
-        Write-Host "  adb sees: $($det.Raw -join ' | ')" -ForegroundColor DarkGray
+    Write-Host "glasses on PC   : $(if ($glasses.Found) { "YES ($($glasses.Match))" } else { 'no (EDID not matched)' })"
+
+    $detected = if ($glasses.Found) { 'usb' } elseif ($phones.Phones.Count -gt 0) { 'adb' } else { $null }
+
+    if ($Explicit -and $Explicit -ne 'auto') {
+        $chosen = $Explicit
+        $reason = "forced by -Mode $Explicit"
+        if ($detected -and $detected -ne $chosen) {
+            Write-Host "  NOTE: hardware suggests '$detected' but -Mode forces '$chosen'." -ForegroundColor Yellow
+        }
+    } elseif ($detected) {
+        $chosen = $detected
+        $reason = 'auto detect'
+        if ($glasses.Found -and $phones.Phones.Count -gt 0) {
+            Write-Host "  NOTE: both connected; auto picked 'usb' (glasses on PC)." -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host "  neither a USB phone nor the glasses could be detected." -ForegroundColor Yellow
+        Write-Host "  Use -Mode usb or -Mode adb to choose explicitly." -ForegroundColor Yellow
+        return [pscustomobject]@{ Mode = $null; Reason = 'undetermined'; Phones = $phones; Glasses = $glasses }
     }
-    Write-Host "=> decided mode: $mode"
-    return $mode
+
+    Write-Host "=> mode: $chosen ($reason)"
+    return [pscustomobject]@{ Mode = $chosen; Reason = $reason; Phones = $phones; Glasses = $glasses }
+}
+
+function Run-Once {
+    $decision = Decide-Mode -Adb $adb -Explicit $Mode -Kw $keywords
+    if (-not $decision.Mode) { return $null }
+
+    if ($Status) {
+        Write-Host ""
+        Write-Host "-Status: nothing changed." -ForegroundColor Cyan
+        return $decision.Mode
+    }
+
+    Write-Host ""
+    [void](Apply-Mode -Target $decision.Mode)
+    Persist-Mode -Target $decision.Mode -Dir $dashboardDir
+
+    if ($Launch) {
+        Start-VRStack -Target $decision.Mode -Adb $adb -Dir $dashboardDir
+    } else {
+        Write-Host ""
+        Write-Host "Restart SteamVR to apply, or re-run with -Launch."
+    }
+    return $decision.Mode
 }
 
 if ($Watch) {
     Write-Host "Watch mode - polling every $Interval s. Ctrl+C to stop." -ForegroundColor Cyan
     $last = $null
     while ($true) {
-        $mode = Show-Decision $adb
-        if ($mode -ne $last) {
-            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] switching to '$mode'" -ForegroundColor Cyan
-            [void](Apply-Mode $mode)
-            if ($Launch) { Start-VRStack -Mode $mode -Adb $adb }
-            $last = $mode
+        $current = Run-Once
+        if ($current -and $current -ne $last) {
+            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] mode is '$current'" -ForegroundColor Cyan
+            $last = $current
         }
         Start-Sleep -Seconds $Interval
     }
 }
 
-$mode = Show-Decision $adb
-
-if ($Status) {
-    Write-Host ""
-    Write-Host "-Status: nothing changed." -ForegroundColor Cyan
-    exit 0
-}
-
-Write-Host ""
-[void](Apply-Mode $mode)
-
-if ($Launch) {
-    Start-VRStack -Mode $mode -Adb $adb
-} else {
-    Write-Host ""
-    Write-Host "Driver flags applied. Restart SteamVR to use it,"
-    Write-Host "or re-run with -Launch to start everything now."
-}
-
+[void](Run-Once)
 exit 0
