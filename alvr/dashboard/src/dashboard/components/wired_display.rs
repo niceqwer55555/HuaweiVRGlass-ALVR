@@ -1,0 +1,421 @@
+//! "有线投屏" tab - the glasses docked to the PC are just a DP monitor. This
+//! tab turns that monitor into an immersive desktop instead of a plain second
+//! screen, by driving the vendored desktop-mode renderer
+//! (`desktop-mode/HwVRDesktop.exe`, MIT, deps/huawei-desktop).
+//!
+//! The renderer captures the Windows desktop with DXGI Desktop Duplication and
+//! draws it as a curved, stereo-corrected image into the glasses panel. It does
+//! not need SteamVR, the Huawei assistant, or the USB data link. This tab owns
+//! the display setup, the renderer lifecycle and its `desktop_mode.ini`.
+
+use alvr_server_io::{apply_cast, list_displays, CastLayout, DisplayInfo};
+use alvr_gui_common::theme;
+use eframe::egui::{self, RichText, Ui};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
+};
+
+const RENDERER_DIR: &str = "desktop-mode";
+const RENDERER_EXE: &str = "HwVRDesktop.exe";
+const RENDERER_CONFIG: &str = "desktop_mode.ini";
+
+/// A single ini key we expose in the UI. `section.key` maps to the file.
+struct IniField {
+    section: &'static str,
+    key: &'static str,
+    label: &'static str,
+    hint: &'static str,
+}
+
+const FIELDS: &[IniField] = &[
+    IniField { section: "display", key: "distance", label: "距离 (m)", hint: "画面离眼睛多远，0.5~10" },
+    IniField { section: "display", key: "scale", label: "缩放", hint: "画面大小" },
+    IniField { section: "display", key: "curvature", label: "弯曲度", hint: "0=平面，1=贴脸圆柱" },
+    IniField { section: "display", key: "opacity", label: "不透明度", hint: "0~1" },
+    IniField { section: "display", key: "ipd", label: "瞳距 (mm)", hint: "左右眼间距" },
+    IniField { section: "display", key: "fov_tan_x", label: "水平视角", hint: "tan 值，1.0=90°，越小画面越大" },
+    IniField { section: "mode", key: "follow", label: "跟随头部 (1/0)", hint: "1=平滑跟随，0=悬停世界锁定" },
+    IniField { section: "s3d", key: "mode", label: "3D 模式", hint: "0=2D，1=SBS半宽，2=SBS全宽，3=上下" },
+];
+
+pub struct WiredDisplayTab {
+    displays: Vec<DisplayInfo>,
+    selected: Option<String>,
+    status: Option<(bool, String)>,
+    dirty: bool,
+    /// Values loaded from / saved to desktop_mode.ini, parallel to FIELDS.
+    values: Vec<String>,
+    config_loaded: bool,
+}
+
+impl Default for WiredDisplayTab {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Directory holding the renderer + its ini, next to the dashboard executable.
+fn renderer_dir() -> Option<PathBuf> {
+    let mut dir = std::env::current_exe().ok()?;
+    dir.pop();
+    Some(dir.join(RENDERER_DIR))
+}
+
+fn renderer_exe() -> Option<PathBuf> {
+    renderer_dir().map(|dir| dir.join(RENDERER_EXE))
+}
+
+/// Read one `section.key` value from an ini string.
+fn ini_get(text: &str, section: &str, key: &str) -> Option<String> {
+    let mut in_section = false;
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            in_section = trimmed[1..trimmed.len() - 1].trim().eq_ignore_ascii_case(section);
+            continue;
+        }
+        if !in_section || trimmed.is_empty() || trimmed.starts_with('#') || trimmed.starts_with(';') {
+            continue;
+        }
+        if let Some((k, v)) = trimmed.split_once('=') {
+            if k.trim().eq_ignore_ascii_case(key) {
+                return Some(v.trim().to_owned());
+            }
+        }
+    }
+    None
+}
+
+/// Set one `section.key` value in an ini string, preserving everything else.
+fn ini_set(text: &str, section: &str, key: &str, value: &str) -> String {
+    let mut lines: Vec<String> = text.lines().map(str::to_owned).collect();
+    let mut in_section = false;
+    let mut found = false;
+    for line in &mut lines {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            in_section = trimmed[1..trimmed.len() - 1].trim().eq_ignore_ascii_case(section);
+            continue;
+        }
+        if in_section && !found && !trimmed.starts_with('#') && !trimmed.starts_with(';') {
+            if let Some((k, _)) = trimmed.split_once('=') {
+                if k.trim().eq_ignore_ascii_case(key) {
+                    *line = format!("{}={}", k.trim(), value);
+                    found = true;
+                }
+            }
+        }
+    }
+    if !found {
+        if !lines.iter().any(|l| l.trim().eq_ignore_ascii_case(&format!("[{section}]"))) {
+            if !lines.is_empty() && !lines.last().map(|l| l.is_empty()).unwrap_or(true) {
+                lines.push(String::new());
+            }
+            lines.push(format!("[{section}]"));
+        }
+        // Insert right after the section header.
+        let header = format!("[{section}]");
+        if let Some(pos) = lines.iter().position(|l| l.trim().eq_ignore_ascii_case(&header)) {
+            lines.insert(pos + 1, format!("{key}={value}"));
+        }
+    }
+    let mut out = lines.join("\n");
+    out.push('\n');
+    out
+}
+
+impl WiredDisplayTab {
+    pub fn new() -> Self {
+        let mut tab = Self {
+            displays: vec![],
+            selected: None,
+            status: None,
+            dirty: true,
+            values: vec![String::new(); FIELDS.len()],
+            config_loaded: false,
+        };
+        tab.refresh();
+        tab
+    }
+
+    fn refresh(&mut self) {
+        self.displays = list_displays();
+        if self
+            .selected
+            .as_ref()
+            .map(|name| !self.displays.iter().any(|d| &d.device_name == name))
+            .unwrap_or(true)
+        {
+            self.selected = self
+                .displays
+                .iter()
+                .find(|d| d.is_glasses())
+                .or_else(|| self.displays.iter().find(|d| d.attached))
+                .map(|d| d.device_name.clone());
+        }
+        self.load_config();
+        self.dirty = false;
+    }
+
+    fn load_config(&mut self) {
+        self.config_loaded = false;
+        let Some(dir) = renderer_dir() else { return };
+        let text = fs::read_to_string(dir.join(RENDERER_CONFIG)).unwrap_or_default();
+        for (i, field) in FIELDS.iter().enumerate() {
+            self.values[i] = ini_get(&text, field.section, field.key).unwrap_or_default();
+        }
+        self.config_loaded = !text.is_empty();
+    }
+
+    fn save_config(&mut self) {
+        let Some(dir) = renderer_dir() else {
+            self.set_status(false, "无法确定程序目录");
+            return;
+        };
+        if let Err(err) = fs::create_dir_all(&dir) {
+            self.set_status(false, format!("无法创建桌面模式目录：{err}"));
+            return;
+        }
+        let path = dir.join(RENDERER_CONFIG);
+        let text = fs::read_to_string(&path).unwrap_or_default();
+        let mut updated = text;
+        for (i, field) in FIELDS.iter().enumerate() {
+            let value = self.values[i].trim();
+            if !value.is_empty() {
+                updated = ini_set(&updated, field.section, field.key, value);
+            }
+        }
+        match fs::write(&path, updated) {
+            Ok(()) => {
+                self.config_loaded = true;
+                self.set_status(true, format!("已保存配置：{}", path.display()));
+            }
+            Err(err) => self.set_status(false, format!("保存配置失败：{err}")),
+        }
+    }
+
+    fn set_status(&mut self, ok: bool, message: impl Into<String>) {
+        self.status = Some((ok, message.into()));
+    }
+
+    fn report(&mut self, result: alvr_common::anyhow::Result<()>, ok_text: &str) {
+        self.status = Some(match result {
+            Ok(()) => (true, ok_text.to_owned()),
+            Err(err) => (false, err.to_string()),
+        });
+        self.dirty = true;
+    }
+
+    fn renderer_running() -> bool {
+        let Ok(out) = Command::new("tasklist")
+            .args(["/FI", &format!("IMAGENAME eq {RENDERER_EXE}"), "/NH"])
+            .output()
+        else {
+            return false;
+        };
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        stdout.to_ascii_lowercase().contains(&RENDERER_EXE.to_ascii_lowercase())
+    }
+
+    fn start_renderer(&mut self) {
+        let Some(exe) = renderer_exe() else {
+            self.set_status(false, "无法确定程序目录");
+            return;
+        };
+        if !exe.is_file() {
+            self.set_status(
+                false,
+                format!("找不到桌面模式渲染器：{}（请确认 desktop-mode 目录随包分发）", exe.display()),
+            );
+            return;
+        }
+        if Self::renderer_running() {
+            self.set_status(true, "桌面模式已经在运行");
+            return;
+        }
+        // SteamVR and desktop mode fight over the glasses monitor; stop it.
+        crate::steamvr_launcher::maybe_kill_steamvr();
+
+        match Command::new(&exe)
+            .current_dir(exe.parent().unwrap_or(Path::new(".")))
+            .stdin(Stdio::null())
+            .spawn()
+        {
+            Ok(_) => self.set_status(true, "桌面模式已启动（退出快捷键见下方说明）"),
+            Err(err) => self.set_status(false, format!("启动桌面模式失败：{err}")),
+        }
+    }
+
+    fn stop_renderer(&mut self) {
+        let _ = Command::new("taskkill")
+            .args(["/IM", RENDERER_EXE, "/F"])
+            .output();
+        self.set_status(true, "已停止桌面模式");
+    }
+
+    pub fn ui(&mut self, ui: &mut Ui) {
+        if self.dirty {
+            self.refresh();
+        }
+
+        let palette = theme::palette(ui.ctx());
+        let glasses = self.displays.iter().find(|d| d.is_glasses()).cloned();
+        let renderer_ready = renderer_exe().map(|p| p.is_file()).unwrap_or(false);
+
+        theme::card_frame(ui.ctx())
+            .fill(palette.surface)
+            .show(ui, |ui| {
+                ui.label(RichText::new("有线投屏（桌面模式）").size(18.0).strong());
+                ui.label(
+                    RichText::new(
+                        "眼镜直插 PC 时是一块 3200x1600 的 DP 显示器。桌面模式把 Windows 桌面直接画进眼镜，\
+                         带曲面/3D/头动跟随，无需 SteamVR 或华为助手。使用「auto-vr-mode.ps1 -Mode usb」切到直连模式。",
+                    )
+                    .size(12.0)
+                    .color(palette.muted_foreground),
+                );
+                ui.add_space(6.0);
+
+                let (text, color) = match &glasses {
+                    Some(g) => (
+                        format!("已检测到眼镜：{} — {}", g.friendly_name, g.summary()),
+                        palette.ok,
+                    ),
+                    None => (
+                        "未检测到眼镜显示器（EDID 无 RTK2560/HUAWEI）——先插好 USB-C 并确认是扩展屏".to_owned(),
+                        palette.accent_variant,
+                    ),
+                };
+                ui.colored_label(color, text);
+
+                let (rtext, rcolor) = if renderer_ready {
+                    ("桌面模式渲染器：已就绪", palette.ok)
+                } else {
+                    ("桌面模式渲染器：缺失（desktop-mode/HwVRDesktop.exe）", palette.error)
+                };
+                ui.colored_label(rcolor, rtext);
+            });
+
+        ui.add_space(10.0);
+        theme::card_frame(ui.ctx())
+            .fill(palette.surface)
+            .show(ui, |ui| {
+                ui.label(RichText::new("启动 / 停止").size(16.0).strong());
+                ui.horizontal(|ui| {
+                    if ui
+                        .add_enabled(renderer_ready && glasses.is_some(), egui::Button::new("启动桌面模式"))
+                        .clicked()
+                    {
+                        self.start_renderer();
+                    }
+                    if ui.button("停止桌面模式").clicked() {
+                        self.stop_renderer();
+                    }
+                    ui.label(
+                        RichText::new(format!(
+                            "状态：{}",
+                            if Self::renderer_running() { "运行中" } else { "未运行" }
+                        ))
+                        .weak(),
+                    );
+                });
+                ui.label(
+                    RichText::new(
+                        "默认快捷键：Ctrl+Alt+Home 回中 / 方向键 平移 / +/- 缩放 / PageUp·PageDown 弯曲 / \
+                         ]·[ 距离 / 3 切 3D / F 跟随·悬停 / H 帮助。可在 desktop_mode.ini 的 [hotkeys] 改。",
+                    )
+                    .size(11.0)
+                    .color(palette.muted_foreground),
+                );
+            });
+
+        ui.add_space(10.0);
+        theme::card_frame(ui.ctx())
+            .fill(palette.surface)
+            .show(ui, |ui| {
+                ui.label(RichText::new("画面参数").size(16.0).strong());
+                ui.label(
+                    RichText::new(if self.config_loaded {
+                        "配置来自 desktop_mode.ini（运行中改动会自动重载）"
+                    } else {
+                        "未找到 desktop_mode.ini，将用渲染器默认值；点保存即生成"
+                    })
+                    .size(11.0)
+                    .color(palette.muted_foreground),
+                );
+                ui.add_space(4.0);
+                for (i, field) in FIELDS.iter().enumerate() {
+                    ui.horizontal(|ui| {
+                        ui.label(field.label).on_hover_text(field.hint);
+                        ui.add(
+                            egui::TextEdit::singleline(&mut self.values[i])
+                                .desired_width(80.0)
+                                .hint_text("默认"),
+                        );
+                    });
+                }
+                if ui.button("保存参数").clicked() {
+                    self.save_config();
+                }
+            });
+
+        ui.add_space(10.0);
+        theme::card_frame(ui.ctx())
+            .fill(palette.surface)
+            .show(ui, |ui| {
+                ui.label(RichText::new("显示器布局（可选）").size(16.0).strong());
+                ui.label(
+                    RichText::new("桌面模式会在眼镜屏上开全屏窗口；下面这些只影响普通桌面镜像，可不用。")
+                        .size(11.0)
+                        .color(palette.muted_foreground),
+                );
+                ui.horizontal(|ui| {
+                    if ui
+                        .add_enabled(glasses.is_some(), egui::Button::new("镜像主屏到眼镜"))
+                        .clicked()
+                    {
+                        let result = apply_cast(CastLayout::Mirror);
+                        self.report(result, "已镜像桌面到眼镜");
+                    }
+                    if ui
+                        .add_enabled(glasses.is_some(), egui::Button::new("扩展为第二屏"))
+                        .clicked()
+                    {
+                        let result = apply_cast(CastLayout::ExtendRight);
+                        self.report(result, "眼镜已扩展为主屏右侧");
+                    }
+                    if ui.button("刷新显示器").clicked() {
+                        self.status = None;
+                        self.dirty = true;
+                    }
+                });
+            });
+
+        if let Some((ok, message)) = &self.status {
+            ui.add_space(8.0);
+            ui.colored_label(if *ok { palette.ok } else { palette.error }, message);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ini_get, ini_set};
+
+    #[test]
+    fn ini_round_trip_preserves_other_keys() {
+        let original = "[general]\nenabled=1\n\n[display]\ndistance=2.0\nscale=4.29\n";
+        let updated = ini_set(original, "display", "distance", "3.5");
+        assert_eq!(ini_get(&updated, "display", "distance").as_deref(), Some("3.5"));
+        assert_eq!(ini_get(&updated, "display", "scale").as_deref(), Some("4.29"));
+        assert_eq!(ini_get(&updated, "general", "enabled").as_deref(), Some("1"));
+    }
+
+    #[test]
+    fn ini_set_adds_missing_section_and_key() {
+        let updated = ini_set("", "s3d", "mode", "2");
+        assert_eq!(ini_get(&updated, "s3d", "mode").as_deref(), Some("2"));
+    }
+}

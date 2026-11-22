@@ -1,7 +1,9 @@
+mod display;
 mod firewall;
 mod openvr_drivers;
 mod openvrpaths;
 
+pub use display::*;
 pub use firewall::*;
 pub use openvr_drivers::*;
 pub use openvrpaths::*;

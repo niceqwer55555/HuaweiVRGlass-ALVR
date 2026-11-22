@@ -4,6 +4,8 @@ mod drawer;
 use self::components::{
     DevicesTab, LogsTab, NotificationBar, SettingsTab, SetupWizard, SetupWizardRequest,
 };
+#[cfg(not(target_arch = "wasm32"))]
+use self::components::WiredDisplayTab;
 use crate::{
     dashboard::components::{CloseAction, NewVersionPopup, StatisticsTab},
     icons, DataSources,
@@ -67,6 +69,8 @@ enum Tab {
     #[cfg(not(target_arch = "wasm32"))]
     GameLibrary,
     #[cfg(not(target_arch = "wasm32"))]
+    WiredDisplay,
+    #[cfg(not(target_arch = "wasm32"))]
     Installation,
     Logs,
     Debug,
@@ -79,6 +83,8 @@ const TABS: &[Tab] = &[
     Tab::Settings,
     #[cfg(not(target_arch = "wasm32"))]
     Tab::GameLibrary,
+    #[cfg(not(target_arch = "wasm32"))]
+    Tab::WiredDisplay,
     #[cfg(not(target_arch = "wasm32"))]
     Tab::Installation,
     Tab::Logs,
@@ -95,6 +101,8 @@ impl Tab {
             #[cfg(not(target_arch = "wasm32"))]
             Self::GameLibrary => "游戏库",
             #[cfg(not(target_arch = "wasm32"))]
+            Self::WiredDisplay => "有线投屏",
+            #[cfg(not(target_arch = "wasm32"))]
             Self::Installation => "安装",
             Self::Logs => "日志",
             Self::Debug => "调试",
@@ -110,6 +118,8 @@ impl Tab {
             #[cfg(not(target_arch = "wasm32"))]
             Self::GameLibrary => "设置 SteamVR 路径、免 Steam 直接启动游戏",
             #[cfg(not(target_arch = "wasm32"))]
+            Self::WiredDisplay => "眼镜直插 PC：桌面画面投进眼镜（曲面/3D/头动）",
+            #[cfg(not(target_arch = "wasm32"))]
             Self::Installation => "维护 SteamVR 驱动与防火墙规则",
             Self::Logs => "查看运行日志与诊断信息",
             Self::Debug => "检查追踪、按键与触觉事件",
@@ -124,6 +134,8 @@ impl Tab {
             Self::Settings => icons::SETTINGS,
             #[cfg(not(target_arch = "wasm32"))]
             Self::GameLibrary => icons::INSTALL_DESKTOP,
+            #[cfg(not(target_arch = "wasm32"))]
+            Self::WiredDisplay => icons::MONITORING,
             #[cfg(not(target_arch = "wasm32"))]
             Self::Installation => icons::INSTALL_DESKTOP,
             Self::Logs => icons::DESCRIPTION,
@@ -148,6 +160,8 @@ pub struct Dashboard {
     settings_tab: SettingsTab,
     #[cfg(not(target_arch = "wasm32"))]
     game_library_tab: components::GameLibraryTab,
+    #[cfg(not(target_arch = "wasm32"))]
+    wired_display_tab: WiredDisplayTab,
     #[cfg(not(target_arch = "wasm32"))]
     installation_tab: components::InstallationTab,
     logs_tab: LogsTab,
@@ -224,6 +238,8 @@ impl Dashboard {
             settings_tab: SettingsTab::new(),
             #[cfg(not(target_arch = "wasm32"))]
             game_library_tab: components::GameLibraryTab::new(steamvr_path, steam_root),
+            #[cfg(not(target_arch = "wasm32"))]
+            wired_display_tab: WiredDisplayTab::new(),
             #[cfg(not(target_arch = "wasm32"))]
             installation_tab: components::InstallationTab::new(),
             logs_tab: LogsTab::new(),
@@ -499,6 +515,10 @@ impl eframe::App for Dashboard {
                             #[cfg(not(target_arch = "wasm32"))]
                             Tab::GameLibrary => {
                                 self.game_library_tab.ui(ui);
+                            }
+                            #[cfg(not(target_arch = "wasm32"))]
+                            Tab::WiredDisplay => {
+                                self.wired_display_tab.ui(ui);
                             }
                             #[cfg(not(target_arch = "wasm32"))]
                             Tab::Installation => {
