@@ -302,7 +302,17 @@ function Decide-Mode {
     }
     Write-Host "glasses on PC   : $(if ($glasses.Found) { "YES ($($glasses.Match))" } else { 'no (EDID not matched)' })"
 
-    $detected = if ($glasses.Found) { 'usb' } elseif ($phones.Phones.Count -gt 0) { 'adb' } else { $null }
+    # Seeing the glasses as a DP monitor is not sufficient: the official driver
+    # also needs the Huawei assistant to own the USB/DP link. Without it the
+    # driver fails with pNumDisplay=0 / Init_HmdNotFound, leaving no HMD at all.
+    # Mirror the Rust auto selection: only pick usb when the assistant is alive.
+    $assistant = @(Get-Process -ErrorAction SilentlyContinue |
+                   Where-Object { $_.ProcessName -match 'HwPCVRAssistant|PCCastScreen|HwVRGlassLite' })
+    $wiredReady = $glasses.Found -and $assistant.Count -gt 0
+    if ($glasses.Found -and -not $wiredReady) {
+        Write-Host "  NOTE: glasses on PC but Huawei assistant not running -> official wired cannot init." -ForegroundColor Yellow
+    }
+    $detected = if ($wiredReady) { 'usb' } elseif ($phones.Phones.Count -gt 0) { 'adb' } else { $null }
 
     if ($Explicit -and $Explicit -ne 'auto') {
         $chosen = $Explicit

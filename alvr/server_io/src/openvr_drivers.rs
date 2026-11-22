@@ -214,6 +214,38 @@ pub fn is_glasses_attached_to_pc(keywords: &[String]) -> bool {
     })
 }
 
+/// Whether the Huawei PC VR assistant is running.
+///
+/// The official wired driver needs the assistant to own the glasses' USB/DP
+/// link: without it the driver reports `pNumDisplay = 0` and fails to load with
+/// `VRInitError_Init_HmdNotFound`, leaving SteamVR with no HMD at all. Auto
+/// driver selection must therefore NOT switch to huaweiVR on EDID evidence
+/// alone - it also needs the assistant to be alive (or the user to have forced
+/// `usb` explicitly via vr_mode.txt).
+#[cfg(windows)]
+pub fn is_huawei_assistant_running() -> bool {
+    use std::process::Command;
+
+    // sysinfo is a dashboard dependency, not server_io's. tasklist is always
+    // available on Windows and keeps this crate dependency-free. Compare raw
+    // bytes: tasklist output uses the OEM code page on zh-CN systems.
+    let Ok(output) = Command::new("tasklist")
+        .args(["/NH"])
+        .output()
+    else {
+        return false;
+    };
+    let stdout = String::from_utf8_lossy(&output.stdout).to_ascii_lowercase();
+    ["hwpcvrassistant.exe", "pccastscreen.exe", "hwvrglasslite.exe"]
+        .iter()
+        .any(|name| stdout.contains(name))
+}
+
+#[cfg(not(windows))]
+pub fn is_huawei_assistant_running() -> bool {
+    false
+}
+
 /// Choose which HMD driver SteamVR activates, from where the glasses actually are.
 ///
 /// The Huawei VR Glass has a single USB-C port, and so does the phone. That makes
@@ -231,19 +263,36 @@ pub fn is_glasses_attached_to_pc(keywords: &[String]) -> bool {
 ///
 /// Returns `None` if Huawei's driver is not installed, in which case nothing is
 /// touched (otherwise this would disable ALVR on machines that have no alternative).
+/// Explicit driver choice - bypasses all auto-detection. Used when the user
+/// forced a mode via `vr_mode.txt` and therefore knows what they want.
+pub fn select_driver(use_huawei: bool) -> Result<()> {
+    let (winner, loser) = if use_huawei {
+        (HUAWEI_DRIVER_NAME, ALVR_DRIVER_NAME)
+    } else {
+        (ALVR_DRIVER_NAME, HUAWEI_DRIVER_NAME)
+    };
+    set_driver_enabled(winner, true)?;
+    set_driver_enabled(loser, false)?;
+    Ok(())
+}
+
 pub fn apply_auto_driver_selection(glasses_on_pc: bool) -> Result<Option<&'static str>> {
     if !is_huawei_driver_registered()? {
         return Ok(None);
     }
 
-    let (winner, loser) = if glasses_on_pc {
-        (HUAWEI_DRIVER_NAME, ALVR_DRIVER_NAME)
+    // Seeing the glasses as a monitor is not enough: the official driver can
+    // only initialise while the Huawei assistant owns the glasses' USB/DP link.
+    // Without it the driver reports pNumDisplay=0 / Init_HmdNotFound and
+    // SteamVR ends up with no HMD at all - while we have just disabled ALVR.
+    // Prefer ALVR unless the assistant is actually running.
+    let wired_ready = glasses_on_pc && is_huawei_assistant_running();
+    let winner = if wired_ready {
+        HUAWEI_DRIVER_NAME
     } else {
-        (ALVR_DRIVER_NAME, HUAWEI_DRIVER_NAME)
+        ALVR_DRIVER_NAME
     };
-
-    set_driver_enabled(winner, true)?;
-    set_driver_enabled(loser, false)?;
+    select_driver(wired_ready)?;
 
     Ok(Some(winner))
 }

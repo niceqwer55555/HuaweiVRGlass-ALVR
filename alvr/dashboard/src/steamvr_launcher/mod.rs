@@ -287,22 +287,22 @@ fn glasses_edid_keywords() -> Vec<String> {
 /// is launched.
 fn apply_auto_driver_selection() {
     let mode = connection_mode();
-    // An explicit `usb`/`adb` choice wins: the user may have both cables
-    // attached, or EDID may fail to identify the glasses. Only `auto` consults
-    // the hardware, so a manual selection is never overwritten on restart.
-    let glasses_on_pc = match mode {
-        ConnectionMode::Usb => true,
-        ConnectionMode::Adb => false,
+
+    // Explicit choices bypass ALL detection: if the user wrote `usb`, they
+    // accept responsibility for having the assistant running; if `adb`, ALVR
+    // must win even though the glasses happen to be a DP monitor on this PC.
+    let result = match mode {
+        ConnectionMode::Usb => alvr_server_io::select_driver(true).map(|_| Some("huaweiVR")),
+        ConnectionMode::Adb => alvr_server_io::select_driver(false).map(|_| Some("alvr_server")),
         ConnectionMode::Auto => {
             let keywords = glasses_edid_keywords();
-            alvr_server_io::is_glasses_attached_to_pc(&keywords)
+            let glasses_on_pc = alvr_server_io::is_glasses_attached_to_pc(&keywords);
+            alvr_server_io::apply_auto_driver_selection(glasses_on_pc)
         }
     };
 
-    match alvr_server_io::apply_auto_driver_selection(glasses_on_pc) {
-        Ok(Some(winner)) => debug!(
-            "Driver selection: using {winner} (mode {mode:?}, glasses on PC: {glasses_on_pc})"
-        ),
+    match result {
+        Ok(Some(winner)) => debug!("Driver selection: using {winner} (mode {mode:?})"),
         Ok(None) => debug!("Driver selection: skipped, no Huawei driver registered"),
         Err(err) => warn!("Driver selection failed: {err:?}"),
     }
