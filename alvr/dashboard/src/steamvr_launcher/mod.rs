@@ -245,7 +245,12 @@ pub fn selected_connection_mode() -> &'static str {
 /// The glasses are a plain DisplayPort panel, so they are identified by the
 /// monitor EDID they report. `RTK2560` is the Realtek bridge inside the HUAWEI
 /// VR Glass; the rest are fallbacks for other reports.
-const DEFAULT_GLASSES_KEYWORDS: &[&str] = &["RTK2560", "HUAWEI", "VRGLASS", "VR GLASS"];
+const DEFAULT_GLASSES_KEYWORDS: &[&str] = &[
+    "RTK2560", "HUAWEI", "VRGLASS", "VR GLASS",
+    // Newer CV10 firmware reports the DP sink as HWV0003 (or AV03), not
+    // RTK2560. Keep these so EDID detection still identifies the glasses.
+    "HWV", "AV03", "CV10",
+];
 
 fn glasses_edid_keywords() -> Vec<String> {
     let mut dir = match std::env::current_exe().ok() {

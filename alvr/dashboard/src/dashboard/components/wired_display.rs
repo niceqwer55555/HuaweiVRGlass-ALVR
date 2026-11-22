@@ -284,7 +284,7 @@ impl WiredDisplayTab {
                         palette.ok,
                     ),
                     None => (
-                        "未检测到眼镜显示器（EDID 无 RTK2560/HUAWEI）——先插好 USB-C 并确认是扩展屏".to_owned(),
+                        "未检测到眼镜显示器（EDID 无 RTK2560/HWV/HUAWEI）——先插好 USB-C 并确认是扩展屏".to_owned(),
                         palette.accent_variant,
                     ),
                 };

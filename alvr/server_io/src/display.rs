@@ -169,7 +169,11 @@ pub enum CastLayout {
 }
 
 /// Keywords identifying the glasses among the monitors.
-const DEFAULT_GLASSES_EDID_KEYWORDS: &[&str] = &["RTK2560", "HUAWEI", "VRGLASS", "VR GLASS"];
+const DEFAULT_GLASSES_EDID_KEYWORDS: &[&str] = &[
+    "RTK2560", "HUAWEI", "VRGLASS", "VR GLASS",
+    // Newer CV10 firmware reports the DP sink as HWV0003 (or AV03).
+    "HWV", "AV03", "CV10",
+];
 
 pub fn is_glasses_monitor_id(monitor_id: &str) -> bool {
     let upper = monitor_id.to_uppercase();

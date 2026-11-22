@@ -67,7 +67,7 @@ function Get-EdidKeywordList {
         return @($EdidKeywords -split '[,\r\n]' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
     }
     # Same defaults as Rust (steamvr_launcher/mod.rs DEFAULT_GLASSES_KEYWORDS).
-    $result = @('RTK2560', 'HUAWEI', 'VRGLASS', 'VR GLASS')
+    $result = @('RTK2560', 'HUAWEI', 'VRGLASS', 'VR GLASS', 'HWV', 'AV03', 'CV10')
     if ($DashboardDir) {
         $f = Join-Path $DashboardDir 'glasses_edid.txt'
         if (Test-Path -LiteralPath $f) {
