@@ -15,7 +15,21 @@ use std::{
     fs,
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    time::{Duration, Instant},
 };
+
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+/// CREATE_NO_WINDOW: the dashboard is a GUI app; spawning tasklist/taskkill
+/// without this flag flashes a black console window on every call. The UI calls
+/// the process check repeatedly, which looked like an endless popup storm.
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+/// How often to re-check whether the renderer is running. Checking every frame
+/// is both wasteful and (without the flag above) visually noisy.
+const PROCESS_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
 const RENDERER_DIR: &str = "desktop-mode";
 const RENDERER_EXE: &str = "HwVRDesktop.exe";
@@ -48,6 +62,9 @@ pub struct WiredDisplayTab {
     /// Values loaded from / saved to desktop_mode.ini, parallel to FIELDS.
     values: Vec<String>,
     config_loaded: bool,
+    /// Cached renderer-running state, refreshed at most once a second.
+    renderer_running: bool,
+    last_process_check: Option<Instant>,
 }
 
 impl Default for WiredDisplayTab {
@@ -135,6 +152,8 @@ impl WiredDisplayTab {
             dirty: true,
             values: vec![String::new(); FIELDS.len()],
             config_loaded: false,
+            renderer_running: false,
+            last_process_check: None,
         };
         tab.refresh();
         tab
@@ -208,15 +227,30 @@ impl WiredDisplayTab {
         self.dirty = true;
     }
 
-    fn renderer_running() -> bool {
-        let Ok(out) = Command::new("tasklist")
-            .args(["/FI", &format!("IMAGENAME eq {RENDERER_EXE}"), "/NH"])
-            .output()
-        else {
+    /// One-off check with no visible console. Called from the throttled refresh
+    /// and from button handlers, never directly in the UI draw path.
+    fn probe_renderer_running() -> bool {
+        let mut command = Command::new("tasklist");
+        command.args(["/FI", &format!("IMAGENAME eq {RENDERER_EXE}"), "/NH"]);
+        #[cfg(windows)]
+        command.creation_flags(CREATE_NO_WINDOW);
+        let Ok(out) = command.output() else {
             return false;
         };
         let stdout = String::from_utf8_lossy(&out.stdout);
         stdout.to_ascii_lowercase().contains(&RENDERER_EXE.to_ascii_lowercase())
+    }
+
+    /// Refreshes the cached state at most once per second.
+    fn refresh_process_state(&mut self) {
+        let due = self
+            .last_process_check
+            .map(|t| t.elapsed() >= PROCESS_POLL_INTERVAL)
+            .unwrap_or(true);
+        if due {
+            self.renderer_running = Self::probe_renderer_running();
+            self.last_process_check = Some(Instant::now());
+        }
     }
 
     fn start_renderer(&mut self) {
@@ -231,27 +265,39 @@ impl WiredDisplayTab {
             );
             return;
         }
-        if Self::renderer_running() {
+        if Self::probe_renderer_running() {
+            self.renderer_running = true;
             self.set_status(true, "桌面模式已经在运行");
             return;
         }
         // SteamVR and desktop mode fight over the glasses monitor; stop it.
         crate::steamvr_launcher::maybe_kill_steamvr();
 
-        match Command::new(&exe)
+        let mut command = Command::new(&exe);
+        command
             .current_dir(exe.parent().unwrap_or(Path::new(".")))
-            .stdin(Stdio::null())
-            .spawn()
-        {
-            Ok(_) => self.set_status(true, "桌面模式已启动（退出快捷键见下方说明）"),
+            .stdin(Stdio::null());
+        #[cfg(windows)]
+        command.creation_flags(CREATE_NO_WINDOW);
+        match command.spawn() {
+            Ok(child) => {
+                self.renderer_running = true;
+                self.last_process_check = Some(Instant::now());
+                let _ = child; // detached: renderer lives on its own
+                self.set_status(true, "桌面模式已启动（退出快捷键见下方说明）");
+            }
             Err(err) => self.set_status(false, format!("启动桌面模式失败：{err}")),
         }
     }
 
     fn stop_renderer(&mut self) {
-        let _ = Command::new("taskkill")
-            .args(["/IM", RENDERER_EXE, "/F"])
-            .output();
+        let mut command = Command::new("taskkill");
+        command.args(["/IM", RENDERER_EXE, "/F"]);
+        #[cfg(windows)]
+        command.creation_flags(CREATE_NO_WINDOW);
+        let _ = command.output();
+        self.renderer_running = false;
+        self.last_process_check = Some(Instant::now());
         self.set_status(true, "已停止桌面模式");
     }
 
@@ -259,6 +305,9 @@ impl WiredDisplayTab {
         if self.dirty {
             self.refresh();
         }
+        // Throttled to once a second: no per-frame tasklist spawn, no console
+        // flash storm when this tab is open.
+        self.refresh_process_state();
 
         let palette = theme::palette(ui.ctx());
         let glasses = self.displays.iter().find(|d| d.is_glasses()).cloned();
@@ -324,7 +373,7 @@ impl WiredDisplayTab {
                     ui.label(
                         RichText::new(format!(
                             "状态：{}",
-                            if Self::renderer_running() { "运行中" } else { "未运行（默认）" }
+                            if self.renderer_running { "运行中" } else { "未运行（默认）" }
                         ))
                         .weak(),
                     );
