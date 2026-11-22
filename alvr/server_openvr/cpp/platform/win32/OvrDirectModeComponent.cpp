@@ -203,6 +203,14 @@ void OvrDirectModeComponent::Present(vr::SharedTextureHandle_t syncTexture) {
 
     ReportPresent(m_targetTimestampNs, 0);
 
+    /* [HVR-FIX] Move encoder wait before AcquireSync: it only waits for the
+     * previous frame's encode-done semaphore, unrelated to current texture.
+     * Waiting while holding the keyed mutex made SteamVR compositor hit
+     * WaitForAcquire timeout and submit cleared (blank) frames. */
+    if (m_pEncoder) {
+        m_pEncoder->WaitForEncode();
+    }
+
     bool useMutex = true;
 
     IDXGIKeyedMutex* pKeyedMutex = NULL;
@@ -234,8 +242,9 @@ void OvrDirectModeComponent::Present(vr::SharedTextureHandle_t syncTexture) {
         // This enforces scheduling of work on the gpu between processes.
         if (SUCCEEDED(pSyncTexture->QueryInterface(__uuidof(IDXGIKeyedMutex), (void**)&pKeyedMutex)
             )) {
-            // TODO: Reasonable timeout and timeout handling
-            HRESULT hr = pKeyedMutex->AcquireSync(0, 10);
+            // [HVR-FIX] 10ms -> 1000ms: software encoder is slow; 10ms timeout
+            // made AcquireSync fail and submit cleared frames.
+            HRESULT hr = pKeyedMutex->AcquireSync(0, 1000);
             if (hr != S_OK) {
                 Debug(
                     "[VDispDvr] ACQUIRESYNC FAILED!!! hr=%d %p %ls", hr, hr, GetErrorStr(hr).c_str()
@@ -361,9 +370,8 @@ void OvrDirectModeComponent::CopyTexture(uint32_t layerCount) {
     m_pD3DRender->GetContext()->Flush();
 
     if (m_pEncoder) {
-        // Wait for the encoder to be ready.  This is important because the encoder thread
-        // blocks on transmit which uses our shared d3d context (which is not thread safe).
-        m_pEncoder->WaitForEncode();
+        // [HVR-FIX] WaitForEncode moved before AcquireSync() in Present(),
+        // to avoid holding the keyed mutex while waiting for the encoder.
 
         std::string debugText;
 

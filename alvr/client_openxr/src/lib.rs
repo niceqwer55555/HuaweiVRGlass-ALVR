@@ -539,9 +539,11 @@ fn entry_point_with_window(_huawei_native_window: Option<*mut c_void>) {
         let capabilities = ClientCapabilities {
             default_view_resolution,
             refresh_rates,
-            // The Huawei direct framebuffer renderer does not yet implement ALVR's fixed
-            // foveated encoding inverse mapping. Keep the server on a linear stereo stream.
-            foveated_encoding: platform != Platform::Unknown && !platform.is_huawei(),
+            // [HVR-FIX] Force foveated_encoding=false for the VR Glass client.
+            // The XrShim renderer cannot invert ALVR's fixed foveated encoding;
+            // when the server enables it the video collapses to blank frames.
+            // P30 (Huawei platform) also reports false and streams real scenes.
+            foveated_encoding: false,
             encoder_high_profile: platform != Platform::Unknown,
             encoder_10_bits: platform != Platform::Unknown,
             encoder_av1: matches!(

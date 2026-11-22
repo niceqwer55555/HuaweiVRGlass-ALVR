@@ -122,10 +122,20 @@ impl StatisticsManager {
     }
 
     pub fn summary(&self, target_timestamp: Duration) -> Option<ClientStatistics> {
+        // [HVR-FIX] Exact timestamp match fails on the VR Glass client because decoded
+        // video frames report timestamp_ns=0 while tracking frames carry real timestamps.
+        // Without a match, report_submit() emits "Statistics summary not ready!" every
+        // frame and the server never receives client statistics -> frame pacing breaks.
+        // Fall back to the newest history frame so statistics still flow.
         self.history_buffer
             .iter()
             .find(|frame| frame.client_stats.target_timestamp == target_timestamp)
+            .or_else(|| self.history_buffer.front())
             .map(|frame| frame.client_stats.clone())
+            .or(Some(ClientStatistics {
+                target_timestamp,
+                ..Default::default()
+            }))
     }
 
     // latency used for head prediction

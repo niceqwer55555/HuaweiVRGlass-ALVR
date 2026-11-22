@@ -424,7 +424,12 @@ impl StreamContext {
             // slots leave one retained frame and two slots for acquiring/discarding stale frames.
             image_reader_max_images: if use_hisi_decoder { 3 } else { 10 },
             prefer_latest_frame: false,
-            retain_last_frame: self.platform.is_huawei(),
+            // [HVR-FIX] retain_last_frame=true for the VR Glass client: the XrShim
+            // swapchain renderer needs the decoder to actively hand over the newest
+            // frame (pop_back). With false, the in_use-based queue stalls and every
+            // decoded frame overflows -> the eye texture stays a flat clear color.
+            // P30 (Huawei platform) already used true and streams real frames.
+            retain_last_frame: true,
             render_output_immediately: use_hisi_decoder,
             configured_frame_size,
             options: self.config.decoder_options.clone(),
