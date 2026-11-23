@@ -10,7 +10,7 @@
 
 use alvr_server_io::{apply_cast, list_displays, CastLayout, DisplayInfo};
 use alvr_gui_common::theme;
-use eframe::egui::{self, RichText, Ui};
+use eframe::egui::{self, RichText, ScrollArea, Ui};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -313,6 +313,21 @@ impl WiredDisplayTab {
         let glasses = self.displays.iter().find(|d| d.is_glasses()).cloned();
         let renderer_ready = renderer_exe().map(|p| p.is_file()).unwrap_or(false);
 
+        // The tab stacks four cards plus parameter rows and a log block, which
+        // easily exceeds a small window. Wrap everything in a vertical scroller
+        // so the lower settings stay reachable.
+        ScrollArea::vertical()
+            .auto_shrink([false, false])
+            .show(ui, |ui| self.render_content(ui, &palette, glasses.as_ref(), renderer_ready));
+    }
+
+    fn render_content(
+        &mut self,
+        ui: &mut Ui,
+        palette: &theme::Palette,
+        glasses: Option<&DisplayInfo>,
+        renderer_ready: bool,
+    ) {
         theme::card_frame(ui.ctx())
             .fill(palette.surface)
             .show(ui, |ui| {
