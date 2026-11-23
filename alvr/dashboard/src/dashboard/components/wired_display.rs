@@ -56,7 +56,7 @@ const fn txt(section: &'static str, key: &'static str, label: &'static str, hint
 const FIELDS: &[IniField] = &[
     // 画面方向（画面上下/左右颠倒时调这里）
     txt("display", "flip180", "整幅翻转180° (0/1)", "画面上下颠倒时设为 1 或 0 试一下"),
-    num("display", "eye_rot_left", "左眼旋转 (°)", "每只眼贴屏旋转；整体向上转90°后为左0/右180", 0.0, 360.0),
+    num("display", "eye_rot_left", "左眼旋转 (°)", "每只眼贴屏旋转；整幅向上翻转后为左90/右270（画面转正）", 0.0, 360.0),
     num("display", "eye_rot_right", "右眼旋转 (°)", "必须与左眼相差180°（面板+镜片物理特性）", 0.0, 360.0),
     num("display", "roll_left", "左眼预旋转 (°)", "画面左右颠倒时微调", -180.0, 180.0),
     num("display", "roll_right", "右眼预旋转 (°)", "画面左右颠倒时微调", -180.0, 180.0),
