@@ -79,8 +79,8 @@ $knownAlvr = New-Object 'System.Collections.Generic.List[string]'
 $knownHuawei = New-Object 'System.Collections.Generic.List[string]'
 $sidecarJson = Read-Json $sidecar
 if ($sidecarJson) {
-    foreach ($p in @($sidecarJson.alvr)) { if ($p -and -not $knownAlvr.Contains($p)) { $knownAlvr.Add($p) } }
-    foreach ($p in @($sidecarJson.huawei)) { if ($p -and -not $knownHuawei.Contains($p)) { $knownHuawei.Add($p) } }
+    foreach ($p in @($sidecarJson.alvr)) { if ($p -and -not (Normalize $p).Contains('\build\end\') -and -not $knownAlvr.Contains($p)) { $knownAlvr.Add($p) } }
+    foreach ($p in @($sidecarJson.huawei)) { if ($p -and -not (Normalize $p).Contains('\build\end\') -and -not $knownHuawei.Contains($p)) { $knownHuawei.Add($p) } }
 }
 
 if (-not (Test-Path -LiteralPath $vrpathPath -PathType Leaf)) {
@@ -130,6 +130,9 @@ $dropNorm = @($dropList | ForEach-Object { Normalize $_ })
 $newList = New-Object 'System.Collections.Generic.List[string]'
 foreach ($p in $registered) {
     $n = Normalize $p
+    # Never keep a driver registered from a packaging output directory: those
+    # are temporary build artifacts and vanish when the folder is cleaned.
+    if ($n.Contains('\build\end\')) { Say "  skip temp build path: $p" 'DarkGray'; continue }
     if ($dropNorm -contains $n) { continue }   # drop inactive HMD driver
     if (-not $newList.Contains($p)) { $newList.Add($p) }
 }
@@ -149,8 +152,24 @@ if (-not (Test-Path -LiteralPath $steamSettings -PathType Leaf)) {
 }
 $raw = Get-Content -LiteralPath $steamSettings -Raw
 $wantHuawei = ($chosen -eq 'usb')
-$raw = [regex]::Replace($raw, '("driver_alvr_server"\s*:\s*\{\s*"enable"\s*:\s*)(true|false)', ('${{1}}' + $(if ($wantHuawei) {'false'} else {'true'})))
-$raw = [regex]::Replace($raw, '("driver_huaweiVR"\s*:\s*\{\s*"enable"\s*:\s*)(true|false)', ('${{1}}' + $(if ($wantHuawei) {'true'} else {'false'})))
+$alvrValue = if ($wantHuawei) { 'false' } else { 'true' }
+$hwValue = if ($wantHuawei) { 'true' } else { 'false' }
+# Use a MatchEvaluator callback instead of a replacement string: '$1' / '${1}'
+# escaping in PowerShell string concatenation previously corrupted the JSON
+# (it wrote a literal "${{1}}" into the file). The callback keeps prefix intact.
+$evalAlvr = [System.Text.RegularExpressions.MatchEvaluator]{
+    param($m) $m.Groups[1].Value + $alvrValue
+}
+$evalHw = [System.Text.RegularExpressions.MatchEvaluator]{
+    param($m) $m.Groups[1].Value + $hwValue
+}
+$raw = [regex]::Replace($raw, '("driver_alvr_server"\s*:\s*\{\s*"enable"\s*:\s*)(true|false)', $evalAlvr)
+$raw = [regex]::Replace($raw, '("driver_huaweiVR"\s*:\s*\{\s*"enable"\s*:\s*)(true|false)', $evalHw)
+# Sanity check: never write invalid JSON back to SteamVR's config.
+$null = $raw | ConvertFrom-Json
+if (-not $raw.Contains('"driver_alvr_server"') -or -not $raw.Contains('"driver_huaweiVR"')) {
+    Fail 'driver enable blocks missing after edit; refusing to write'
+}
 $bak = "$steamSettings.bak_installdrv"
 Copy-Item -LiteralPath $steamSettings -Destination $bak -Force
 [IO.File]::WriteAllText($steamSettings, $raw, (New-Object Text.UTF8Encoding($false)))
