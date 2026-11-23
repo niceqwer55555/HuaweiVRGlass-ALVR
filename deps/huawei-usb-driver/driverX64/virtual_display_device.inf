@@ -1,0 +1,62 @@
+;
+;
+;     ÐéÄâ×ÜÏßÇý¶¯
+;
+;
+[Version]
+Signature="$Windows NT$"
+Class=System
+ClassGuid={4D36E97D-E325-11CE-BFC1-08002BE10318}
+Provider = %OPEN%
+DriverVer = 12/05/2019,1.01.0.0
+CatalogFile = virtual_display_device.cat
+
+[DestinationDirs]
+DefaultDestDir = 12
+
+[SourceDisksNames]
+99 = %DiskId%,,,""
+
+[SourceDisksFiles]
+virtual_display_device.sys  = 99,,
+
+;*****************************************
+;
+;*****************************************
+
+[Manufacturer]
+%OPEN%=Standard,NTamd64
+
+[Standard]
+%DeviceDesc%=Bus_Device, %HardwareId%
+
+[Standard.NTamd64]
+%DeviceDesc%=Bus_Device, %HardwareId%
+
+
+[Bus_Device.NT]
+CopyFiles=Drivers_Dir
+
+[Drivers_Dir]
+virtual_display_device.sys
+
+;-------------- Service installation
+[Bus_Device.NT.Services]
+AddService = virtual_display_device,0x00000002, virtual_display_device_Inst
+
+; -------------- indirect display driver install sections
+[virtual_display_device_Inst]
+DisplayName    = %SVCDESC%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START 
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %12%\virtual_display_device.sys
+LoadOrderGroup = Extended Base
+
+
+[Strings]
+OPEN = "NOLO Co., Ltd."
+DiskId = "Virtual Display Device System Installation Disk"
+DeviceDesc = "Virtual Display Device Bus enumerator"
+SVCDESC = "Virtual Display Device System Driver"
+HardwareId ="root\*virtual_display_device"

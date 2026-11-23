@@ -1,0 +1,122 @@
+;
+; Android WinUsb driver installation.
+;
+[Version]
+Signature           = "$Windows NT$"
+Class               = AndroidUsbDeviceClass
+ClassGuid           = {3F966BD9-FA04-4ec5-991C-D326973B5128}
+Provider            = %ProviderName%
+DriverVer           = 12/28/2015,2.00.03.00
+CatalogFile   = hw_gohdb.cat
+
+;
+; This section seems to be required for WinUsb driver installation.
+; If this section is removed the installer will report an error
+; "Required section not found in INF file".
+;
+[ClassInstall32]
+Addreg = AndroidWinUsbClassReg
+
+[AndroidWinUsbClassReg]
+HKR,,,0,%ClassName%
+HKR,,Icon,,-1
+
+[Manufacturer]
+%ProviderName% = Google, NTx86, NTamd64
+
+[Google.NTx86]
+%CompositeHdbInterface%     = USB_Install, USB\VID_12D1&PID_1073&MI_02
+%CompositeHdbInterface%     = USB_Install, USB\VID_12D1&PID_1074&MI_01 
+%CompositeHdbInterface%     = USB_Install, USB\VID_12D1&PID_1075&MI_02 
+%CompositeHdbInterface%     = USB_Install, USB\VID_12D1&PID_1076&MI_01 
+%CompositeHdbInterface%     = USB_Install, USB\VID_12D1&PID_1077&MI_02
+%CompositeHdbInterface%     = USB_Install, USB\VID_12D1&PID_1078&MI_01
+%CompositeHdbInterface%     = USB_Install, USB\VID_12D1&PID_1079&MI_02
+%CompositeHdbInterface%     = USB_Install, USB\VID_12D1&PID_107A&MI_01
+%CompositeHdbInterface%     = USB_Install, USB\VID_12D1&PID_107B&MI_03
+%CompositeHdbInterface%     = USB_Install, USB\VID_12D1&PID_107c&MI_02
+%CompositeHdbInterface%     = USB_Install, USB\VID_12D1&PID_105C&MI_08
+%CompositeHdbInterface%     = USB_Install, USB\VID_12D1&PID_1035&MI_05
+
+;pnp2.1
+%CompositeHdbInterface%     = USB_Install, USB\VID_12D1&Subclass_48&Prot_01
+
+[Google.NTamd64]
+
+%CompositeHdbInterface%     = USB_Install, USB\VID_12D1&PID_1073&MI_02
+%CompositeHdbInterface%     = USB_Install, USB\VID_12D1&PID_1074&MI_01 
+%CompositeHdbInterface%     = USB_Install, USB\VID_12D1&PID_1075&MI_02 
+%CompositeHdbInterface%     = USB_Install, USB\VID_12D1&PID_1076&MI_01 
+%CompositeHdbInterface%     = USB_Install, USB\VID_12D1&PID_1077&MI_02
+%CompositeHdbInterface%     = USB_Install, USB\VID_12D1&PID_1078&MI_01
+%CompositeHdbInterface%     = USB_Install, USB\VID_12D1&PID_1079&MI_02
+%CompositeHdbInterface%     = USB_Install, USB\VID_12D1&PID_107A&MI_01
+%CompositeHdbInterface%     = USB_Install, USB\VID_12D1&PID_107B&MI_03
+%CompositeHdbInterface%     = USB_Install, USB\VID_12D1&PID_107c&MI_02
+%CompositeHdbInterface%     = USB_Install, USB\VID_12D1&PID_105C&MI_08
+%CompositeHdbInterface%     = USB_Install, USB\VID_12D1&PID_1035&MI_05
+
+;pnp2.1
+%CompositeHdbInterface%     = USB_Install, USB\VID_12D1&Subclass_48&Prot_01
+
+[USB_Install]
+Include = winusb.inf
+Needs   = WINUSB.NT
+
+[USB_Install.Services]
+Include     = winusb.inf
+AddService  = WinUSB,0x00000002,WinUSB_ServiceInstall
+
+[WinUSB_ServiceInstall]
+DisplayName     = %WinUSB_SvcDesc%
+ServiceType     = 1
+StartType       = 3
+ErrorControl    = 1
+ServiceBinary   = %12%\WinUSB.sys
+
+[USB_Install.Wdf]
+KmdfService = WINUSB, WinUSB_Install
+
+[WinUSB_Install]
+KmdfLibraryVersion  = 1.9
+
+[USB_Install.HW]
+AddReg  = Dev_AddReg
+
+[Dev_AddReg]
+HKR,,DeviceInterfaceGUIDs,0x10000,"{9DB27A70-239F-4598-A0E6-C94D8FC7F1B3}"
+
+[USB_Install.CoInstallers]
+AddReg    = CoInstallers_AddReg
+CopyFiles = CoInstallers_CopyFiles
+
+[CoInstallers_AddReg]
+HKR,,CoInstallers32,0x00010000,"WdfCoInstaller01009.dll,WdfCoInstaller","WinUSBCoInstaller2.dll"
+
+[CoInstallers_CopyFiles]
+WinUSBCoInstaller2.dll
+WdfCoInstaller01009.dll
+
+[DestinationDirs]
+CoInstallers_CopyFiles=11
+
+[SourceDisksNames]
+;1 = %DISK_NAME%,,,\i386
+;2 = %DISK_NAME%,,,\amd64
+1 = %DISK_NAME%,,,
+2 = %DISK_NAME%,,,
+
+[SourceDisksFiles.x86]
+WinUSBCoInstaller2.dll  = 1
+WdfCoInstaller01009.dll = 1
+
+[SourceDisksFiles.amd64]
+WinUSBCoInstaller2.dll  = 2
+WdfCoInstaller01009.dll = 2
+
+[Strings]
+ProviderName              = "Google, Inc."
+CompositeHdbInterface="Huawei HDB Interface"
+WinUSB_SvcDesc            = "Android USB Driver"
+DISK_NAME                 = "Android WinUsb installation disk"
+ClassName                 = "Android Phone"

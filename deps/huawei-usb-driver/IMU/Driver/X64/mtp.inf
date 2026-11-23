@@ -1,0 +1,74 @@
+[Version]
+Signature   = "$WINDOWS NT$"
+Class=WPD
+ClassGUID   = {EEC5AD98-8080-425F-922A-DABF3DE3F69A}
+Provider    = %msft%
+LayoutFile=layout.inf
+DriverVer   = 07/29/2015,1.03.00.00
+CatalogFile.NTx86   = mtp86.cat 
+CatalogFile.NTamd64 = mtp64.cat
+
+[Manufacturer]
+%MfgName%=Generic,NTx86,NTamd64
+
+[Generic.NTx86]
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&PID_1051 
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&PID_1052&MI_00 
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&PID_360F&MI_00 
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&PID_361F&MI_00 
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&PID_3614&MI_00 
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&PID_3619&MI_00 
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&PID_3629&MI_00 
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&PID_3612&MI_00 
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&PID_3622&MI_00 
+
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&PID_1075&MI_00 
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&PID_1076&MI_00 
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&PID_1079&MI_00 
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&PID_107A&MI_00 
+;for pnp2.1
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&Subclass_ff&Prot_00 
+ 
+[Generic.NTamd64]
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&PID_1051 
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&PID_1052&MI_00 
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&PID_360F&MI_00 
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&PID_361F&MI_00 
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&PID_3614&MI_00 
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&PID_3619&MI_00 
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&PID_3629&MI_00 
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&PID_3612&MI_00 
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&PID_3622&MI_00 
+
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&PID_1075&MI_00 
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&PID_1076&MI_00
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&PID_1079&MI_00 
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&PID_107A&MI_00  
+;for pnp2.1
+%Generic.DeviceDesc% = MTP, USB\VID_12D1&Subclass_ff&Prot_00 
+
+[MTP]
+Include = wpdmtp.inf
+Needs   = WPD.MTP
+
+[MTP.hw]
+Include = wpdmtp.inf
+Needs   = WPD.MTP.Registration
+
+[MTP.Services]
+Include = wpdmtp.inf
+Needs   = WPD.MTP.Services
+
+[MTP.CoInstallers]
+Include = wpdmtp.inf
+Needs = WPD.MTP.CoInstallers
+
+[MTP.Wdf]
+Include = wpdmtp.inf
+Needs = WPD.MTP.Wdf
+UmdfServiceOrder=WpdMtpDriver
+
+[Strings]
+msft              = "Microsoft"
+MfgName           = "(Standard MTP-compliant devices)"
+Generic.DeviceDesc = "MTP"

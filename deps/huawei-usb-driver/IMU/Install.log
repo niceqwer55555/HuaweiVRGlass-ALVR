@@ -1,0 +1,248 @@
+11/23/2619:24:37  devsetup64:  ----------------------------------------------------------
+
+11/23/2619:24:37  devsetup64: |                     Driver install                       |
+
+11/23/2619:24:37  devsetup64:  ----------------------------------------------------------
+
+11/23/2619:24:37  devsetup64: Info  : Driver Install Begin...
+
+11/23/2619:24:37  devsetup64: Equal to win8
+
+11/23/2619:24:37  devsetup64: Identifier: 
+
+11/23/2619:24:37  devsetup64: Find substring 64, So this is a 64bit OS
+
+11/23/2619:24:37  devsetup64: Info  : OS Version: Win8 64
+
+11/23/2619:24:37  devsetup64: Succeed : Check system info finish. 
+
+11/23/2619:24:37  devsetup64: GetDriverInfo get D:\Program Files (x86)\HwPCVR Assistant\PCCastScreen\DriverSetUp\IMU\Driver\install.xml ok
+
+11/23/2619:24:37  devsetup64: GetInformationFromConfigFile xml path:D:\Program Files (x86)\HwPCVR Assistant\PCCastScreen\DriverSetUp\IMU\Driver\install.xml
+
+11/23/2619:24:37  devsetup64: Identifier: 
+
+11/23/2619:24:37  devsetup64: Find substring 64, So this is a 64bit OS
+
+11/23/2619:24:37  devsetup64: Info: Driver path:D:\Program Files (x86)\HwPCVR Assistant\PCCastScreen\DriverSetUp\IMU\Driver\X64
+
+11/23/2619:24:37  devsetup64: 
+Info  : Remove file [C:\Windows\system32\drivers\hw_usbdev.sys]
+
+11/23/2619:24:37  devsetup64: Info : Remove file fail, info: 2
+
+11/23/2619:24:37  devsetup64: 
+Info  : Remove file [C:\Windows\system32\drivers\hw_quusbmdm.sys]
+
+11/23/2619:24:37  devsetup64: Info : Remove file fail, info: 2
+
+11/23/2619:24:37  devsetup64: 
+Info  : Remove file [C:\Windows\system32\drivers\hw_quusbnet.sys]
+
+11/23/2619:24:37  devsetup64: Info : Remove file fail, info: 2
+
+11/23/2619:24:37  devsetup64: 
+Info  : Remove file [C:\Windows\system32\drivers\usbser.sys]
+
+11/23/2619:24:37  devsetup64: Info : Remove file fail, info: 5
+
+11/23/2619:24:37  devsetup64: 
+Info  : Remove file [C:\Windows\system32\drivers\ew_usbccgpfilter.sys]
+
+11/23/2619:24:37  devsetup64: Info : Remove file fail, info: 5
+
+11/23/2619:24:37  devsetup64: 
+Info  : Remove file [C:\Windows\system32\drivers\hw_cdcacm.sys]
+
+11/23/2619:24:37  devsetup64: Info : Remove file fail, info: 2
+
+11/23/2619:24:37  devsetup64: 
+Info  : Remove file [C:\Windows\system32\drivers\hwusbser.sys]
+
+11/23/2619:24:37  devsetup64: Info : Remove file fail, info: 2
+
+11/23/2619:24:37  devsetup64: 
+Info  : Remove file [C:\Windows\system32\drivers\hmemdm.sys]
+
+11/23/2619:24:37  devsetup64: Info : Remove file fail, info: 2
+
+11/23/2619:24:37  devsetup64: 
+Info  : Remove file [C:\Windows\system32\drivers\hwmob01.sys]
+
+11/23/2619:24:37  devsetup64: Info : Remove file fail, info: 2
+
+11/23/2619:24:37  devsetup64: 
+Info  : Remove file [C:\Windows\system32\drivers\hwadb.sys]
+
+11/23/2619:24:37  devsetup64: Info : Remove file fail, info: 2
+
+11/23/2619:24:37  devsetup64: 
+Info  : Remove file [C:\Windows\system32\drivers\hwusbser02.sys]
+
+11/23/2619:24:37  devsetup64: Info : Remove file fail, info: 2
+
+11/23/2619:24:37  devsetup64: 
+Info  : Remove file [C:\Windows\system32\drivers\diagswitchdrv.sys]
+
+11/23/2619:24:37  devsetup64: Info : Remove file fail, info: 2
+
+11/23/2619:24:37  devsetup64: 
+Info  : Remove driver file, OK.
+
+11/23/2619:24:37  devsetup64: ComDB before install: 252 88 1 0 0 0 0 0 0 0
+
+11/23/2619:24:37  devsetup64: CleanRegUsbFlagInfo Number of subkeys: 64
+
+11/23/2619:24:37  devsetup64: CleanRegUsbFlagInfo Found SYSTEM\CurrentControlSet\Control\usbflags\12D1107E0200 in UsbFlag,Delete OK
+
+11/23/2619:24:37  devsetup64: CleanRegUsbFlagInfo Found SYSTEM\CurrentControlSet\Control\usbflags\12D110920200 in UsbFlag,Delete OK
+
+11/23/2619:24:37  devsetup64: CleanRegUsbFlagInfo Found SYSTEM\CurrentControlSet\Control\usbflags\12D13A090100 in UsbFlag,Delete OK
+
+11/23/2619:24:37  devsetup64: 
+Number of values: 4
+
+11/23/2619:24:37  devsetup64: GetDriverInfo get D:\Program Files (x86)\HwPCVR Assistant\PCCastScreen\DriverSetUp\IMU\Driver\install.xml ok
+
+11/23/2619:24:37  devsetup64: GetInformationFromConfigFile xml path:D:\Program Files (x86)\HwPCVR Assistant\PCCastScreen\DriverSetUp\IMU\Driver\install.xml
+
+11/23/2619:24:37  devsetup64: 
+Info  : CoypInfFile begin....
+
+11/23/2619:24:37  devsetup64: 
+Info  : Install inf file [D:\Program Files (x86)\HwPCVR Assistant\PCCastScreen\DriverSetUp\IMU\Driver\X64\hw_usbdev.inf]
+
+11/23/2619:24:38  devsetup64: Info  : Install inf file OK.
+
+11/23/2619:24:38  devsetup64: 
+Info  : Install inf file [D:\Program Files (x86)\HwPCVR Assistant\PCCastScreen\DriverSetUp\IMU\Driver\X64\hw_quser.inf]
+
+11/23/2619:24:39  devsetup64: Info  : Install inf file OK.
+
+11/23/2619:24:39  devsetup64: 
+Info  : Install inf file [D:\Program Files (x86)\HwPCVR Assistant\PCCastScreen\DriverSetUp\IMU\Driver\X64\hw_qumdm.inf]
+
+11/23/2619:24:39  devsetup64: Info  : Install inf file OK.
+
+11/23/2619:24:39  devsetup64: 
+Info  : Install inf file [D:\Program Files (x86)\HwPCVR Assistant\PCCastScreen\DriverSetUp\IMU\Driver\X64\hw_goadb.inf]
+
+11/23/2619:24:40  devsetup64: Info  : Install inf file OK.
+
+11/23/2619:24:40  devsetup64: 
+Info  : Install inf file [D:\Program Files (x86)\HwPCVR Assistant\PCCastScreen\DriverSetUp\IMU\Driver\X64\hw_gohdb.inf]
+
+11/23/2619:24:40  devsetup64: Info  : Install inf file OK.
+
+11/23/2619:24:40  devsetup64: 
+Info  : Install inf file [D:\Program Files (x86)\HwPCVR Assistant\PCCastScreen\DriverSetUp\IMU\Driver\X64\hw_quusbnet.inf]
+
+11/23/2619:24:41  devsetup64: Info  : Install inf file OK.
+
+11/23/2619:24:41  devsetup64: 
+Info  : Install inf file [D:\Program Files (x86)\HwPCVR Assistant\PCCastScreen\DriverSetUp\IMU\Driver\X64\cdc-acm.inf]
+
+11/23/2619:24:41  devsetup64: Info  : Install inf file OK.
+
+11/23/2619:24:41  devsetup64: 
+Info  : Install inf file [D:\Program Files (x86)\HwPCVR Assistant\PCCastScreen\DriverSetUp\IMU\Driver\X64\ew_usbccgpfilter.inf]
+
+11/23/2619:24:42  devsetup64: Info  : Install inf file OK.
+
+11/23/2619:24:42  devsetup64: 
+Info  : Install inf file [D:\Program Files (x86)\HwPCVR Assistant\PCCastScreen\DriverSetUp\IMU\Driver\X64\hw_cdcacm.inf]
+
+11/23/2619:24:42  devsetup64: Info  : Install inf file OK.
+
+11/23/2619:24:42  devsetup64: 
+Info  : Install inf file [D:\Program Files (x86)\HwPCVR Assistant\PCCastScreen\DriverSetUp\IMU\Driver\X64\hw_cdcmdm.inf]
+
+11/23/2619:24:43  devsetup64: Info  : Install inf file OK.
+
+11/23/2619:24:43  devsetup64: 
+Info  : Install inf file [D:\Program Files (x86)\HwPCVR Assistant\PCCastScreen\DriverSetUp\IMU\Driver\X64\mtp.inf]
+
+11/23/2619:24:43  devsetup64: Info  : Install inf file OK.
+
+11/23/2619:24:43  devsetup64: 
+Info  : Copy file [D:\Program Files (x86)\HwPCVR Assistant\PCCastScreen\DriverSetUp\IMU\Driver\X64\hw_usbdev.sys] --> [C:\Windows\system32\drivers\hw_usbdev.sys] 
+
+11/23/2619:24:43  devsetup64: Info  : Copy file OK.
+
+11/23/2619:24:43  devsetup64: 
+Info  : Copy file [D:\Program Files (x86)\HwPCVR Assistant\PCCastScreen\DriverSetUp\IMU\Driver\X64\hw_quusbmdm.sys] --> [C:\Windows\system32\drivers\hw_quusbmdm.sys] 
+
+11/23/2619:24:43  devsetup64: Info  : Copy file OK.
+
+11/23/2619:24:43  devsetup64: 
+Info  : Copy file [D:\Program Files (x86)\HwPCVR Assistant\PCCastScreen\DriverSetUp\IMU\Driver\X64\hw_quusbnet.sys] --> [C:\Windows\system32\drivers\hw_quusbnet.sys] 
+
+11/23/2619:24:43  devsetup64: Info  : Copy file OK.
+
+11/23/2619:24:43  devsetup64: 
+Info  : Copy file [D:\Program Files (x86)\HwPCVR Assistant\PCCastScreen\DriverSetUp\IMU\Driver\X64\usbser.sys] --> [C:\Windows\system32\drivers\usbser.sys] 
+
+11/23/2619:24:43  devsetup64: Error : Copy  file error.
+
+11/23/2619:24:43  devsetup64: 
+Info  : Copy file [D:\Program Files (x86)\HwPCVR Assistant\PCCastScreen\DriverSetUp\IMU\Driver\X64\ew_usbccgpfilter.sys] --> [C:\Windows\system32\drivers\ew_usbccgpfilter.sys] 
+
+11/23/2619:24:43  devsetup64: Error : Copy  file error.
+
+11/23/2619:24:43  devsetup64: 
+Info  : Copy file [D:\Program Files (x86)\HwPCVR Assistant\PCCastScreen\DriverSetUp\IMU\Driver\X64\hw_cdcacm.sys] --> [C:\Windows\system32\drivers\hw_cdcacm.sys] 
+
+11/23/2619:24:43  devsetup64: Info  : Copy file OK.
+
+11/23/2619:24:43  devsetup64: 
+Info  : Copy file [D:\Program Files (x86)\HwPCVR Assistant\PCCastScreen\DriverSetUp\IMU\Driver\X64\WdfCoInstaller01009.dll] --> [C:\Windows\system32\WdfCoInstaller01009.dll] 
+
+11/23/2619:24:43  devsetup64: Info  : Copy file OK.
+
+11/23/2619:24:43  devsetup64: 
+Info  : Copy file [D:\Program Files (x86)\HwPCVR Assistant\PCCastScreen\DriverSetUp\IMU\Driver\X64\WdfCoInstaller01009.dll] --> [C:\Windows\system32\drivers\WdfCoInstaller01009.dll] 
+
+11/23/2619:24:43  devsetup64: Info  : Copy file OK.
+
+11/23/2619:24:43  devsetup64: 
+Info  : Copy file [D:\Program Files (x86)\HwPCVR Assistant\PCCastScreen\DriverSetUp\IMU\Driver\X64\WUDFUpdate_01009.dll] --> [C:\Windows\system32\drivers\WUDFUpdate_01009.dll] 
+
+11/23/2619:24:43  devsetup64: Info  : Copy file OK.
+
+11/23/2619:24:43  devsetup64: 
+Info  : Copy file [D:\Program Files (x86)\HwPCVR Assistant\PCCastScreen\DriverSetUp\IMU\Driver\X64\WinUSBCoInstaller2.dll] --> [C:\Windows\system32\drivers\winusbcoinstaller2.dll] 
+
+11/23/2619:24:43  devsetup64: Info  : Copy file OK.
+
+11/23/2619:24:43  devsetup64: GetDeviceClass DeviceClass:usb
+
+11/23/2619:24:43  devsetup64: GetDeviceService ,pstService:usbccgp,buffersize:8...
+
+11/23/2619:24:43  devsetup64: GetDeviceService exit,pstService:usbccgp...
+
+11/23/2619:24:44  devsetup64: Info  : SetupDiCallClassInstaller DIF_REMOVE SUC
+
+11/23/2619:24:44  devsetup64: Info[1-7]:usb\vid_12d1&pid_107e&rev_0200[usbccgp]  this is pnp2.1 device,Delete this device
+
+11/23/2619:24:44  devsetup64: Info[1-11]: Remove old device register Info, end...
+
+11/23/2619:24:44  devsetup64: Info[2-3]:Check fake PID 362a whether a mass storage device
+
+11/23/2619:24:44  devsetup64: Info[2-3]:Check fake PID 361a whether a mass storage device
+
+11/23/2619:24:44  devsetup64: Info[2-3]:Check fake PID 1801 whether a mass storage device
+
+11/23/2619:24:44  devsetup64: Info[2-3]:Check fake PID 1800 whether a mass storage device
+
+11/23/2619:24:44  devsetup64: Info[2-3]:Check fake PID 1032 whether a mass storage device
+
+11/23/2619:24:44  devsetup64: Info[2-3]:Check fake PID 1033 whether a mass storage device
+
+11/23/2619:24:44  devsetup64: Info[2-3]:Check fake PID 1030 whether a mass storage device
+
+11/23/2619:24:44  devsetup64: Info[2-3]:Check fake PID 1031 whether a mass storage device
+
+11/23/2619:24:47  devsetup64: Info  : Remove device register Info, END...
+
+11/23/2619:24:47  devsetup64: SUC: end...
+

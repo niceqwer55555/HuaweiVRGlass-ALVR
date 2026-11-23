@@ -1,0 +1,317 @@
+; Copyright (c) 2010,2011 Huawei Incorporated
+; Manufacturer: Huawei Incorporated
+; 
+;
+; HUAWEI Technologies CO.,LTD huawei_cdcacm Virtual Serial Port
+;
+
+[Version]
+Signature="$WINDOWS NT$"
+Class=Ports
+ClassGuid={4D36E978-E325-11CE-BFC1-08002BE10318}
+Provider=%Mfg%
+DriverVer=05/18/2016,1.0.26.0
+CatalogFile=hw_cdcacm.cat
+
+; ================= Device Install section =====================
+
+[ControlFlags]
+ExcludeFromSelect=*
+
+[Manufacturer]
+%Mfg%=DeviceList,NTx86,NTamd64
+
+[SourceDisksFiles]
+hw_cdcacm.sys=1
+
+[SourceDisksNames]
+; diskid = disk-description[,[tag-or-cab-file],[unused,path][,flags]]
+1=%Disk_Description%,
+
+[DestinationDirs]
+DefaultDestDir=12
+
+; For XP and later x86
+[DeviceList.NTx86]
+%HUAWEI_3GPCUIDeviceDesc%      = PCUI_DevInstall, USB\VID_12D1&Subclass_12&Prot_02
+%HUAWEI_3GDIAGDeviceDesc%      = DIAG_DevInstall, USB\VID_12D1&Subclass_12&Prot_03
+%HUAWEI_3GGPSDeviceDesc%       = GPS_DevInstall,  USB\VID_12D1&Subclass_12&Prot_05
+%HUAWEI_ControlDeviceDesc%     = CTRL_DevInstall, USB\VID_12D1&Subclass_12&Prot_06
+%HUAWEI_BTDeviceDesc%          = BT_DevInstall,   USB\VID_12D1&Subclass_12&Prot_0A
+%HUAWEI_PCUIDeviceDesc%        = PCUI_DevInstall, USB\VID_12D1&Subclass_12&Prot_12
+%HUAWEI_DIAGDeviceDesc%        = DIAG_DevInstall, USB\VID_12D1&Subclass_12&Prot_13
+%HUAWEI_GPSDeviceDesc%         = GPS_DevInstall,  USB\VID_12D1&Subclass_12&Prot_14
+;%HUAWEI_PCVoiceDeviceDesc%     = PCVOICE_DevInstall, USB\VID_12D1&Subclass_12&Prot_15
+%HUAWEI_CDMAModemDesc%         = DIAG_DevInstall, USB\VID_12D1&Subclass_12&Prot_17
+%HUAWEI_PCUIDeviceDesc%        = PCUI_DevInstall, USB\VID_12D1&Subclass_12&Prot_22
+%DBAdapterDeviceDesc%          = DIAG_DevInstall, USB\VID_12D1&Subclass_12&Prot_23
+
+%HUAWEI_3GPCUIDeviceDesc%      = PCUI_DevInstall, USB\VID_12D1&Subclass_13&Prot_02
+%HUAWEI_3GDIAGDeviceDesc%      = DIAG_DevInstall, USB\VID_12D1&Subclass_13&Prot_03
+%HUAWEI_3GGPSDeviceDesc%       = GPS_DevInstall,  USB\VID_12D1&Subclass_13&Prot_05
+%HUAWEI_ControlDeviceDesc%     = CTRL_DevInstall, USB\VID_12D1&Subclass_13&Prot_06
+%HUAWEI_BTDeviceDesc%          = BT_DevInstall,   USB\VID_12D1&Subclass_13&Prot_0A
+%HUAWEI_PCUIDeviceDesc%        = PCUI_DevInstall, USB\VID_12D1&Subclass_13&Prot_12
+%HUAWEI_DIAGDeviceDesc%        = DIAG_DevInstall, USB\VID_12D1&Subclass_13&Prot_13
+%HUAWEI_GPSDeviceDesc%         = GPS_DevInstall,  USB\VID_12D1&Subclass_13&Prot_14
+;%HUAWEI_PCVoiceDeviceDesc%     = PCVOICE_DevInstall, USB\VID_12D1&Subclass_13&Prot_15
+%HUAWEI_CDMAModemDesc%         = DIAG_DevInstall, USB\VID_12D1&Subclass_13&Prot_17
+%HUAWEI_SKYTONEMDMDesc%        = PCUI_DevInstall, USB\VID_12D1&Subclass_13&Prot_1E
+%HUAWEI_PCUIDeviceDesc%        = PCUI_DevInstall, USB\VID_12D1&Subclass_13&Prot_22
+%DBAdapterDeviceDesc%          = DIAG_DevInstall, USB\VID_12D1&Subclass_13&Prot_23
+
+; for logo test
+%HUAWEI_PCUIDeviceDesc%      = PCUI_DevInstall, USB\VID_12D1&PID_105A&MI_01
+%HUAWEI_DIAGDeviceDesc%      = DIAG_DevInstall, USB\VID_12D1&PID_105A&MI_02
+
+; For XP and later x64
+[DeviceList.NTamd64]
+%HUAWEI_3GPCUIDeviceDesc%      = PCUI_DevInstall, USB\VID_12D1&Subclass_12&Prot_02
+%HUAWEI_3GDIAGDeviceDesc%      = DIAG_DevInstall, USB\VID_12D1&Subclass_12&Prot_03
+%HUAWEI_3GGPSDeviceDesc%       = GPS_DevInstall,  USB\VID_12D1&Subclass_12&Prot_05
+%HUAWEI_ControlDeviceDesc%     = CTRL_DevInstall, USB\VID_12D1&Subclass_12&Prot_06
+%HUAWEI_BTDeviceDesc%          = BT_DevInstall,   USB\VID_12D1&Subclass_12&Prot_0A
+%HUAWEI_PCUIDeviceDesc%        = PCUI_DevInstall, USB\VID_12D1&Subclass_12&Prot_12
+%HUAWEI_DIAGDeviceDesc%        = DIAG_DevInstall, USB\VID_12D1&Subclass_12&Prot_13
+%HUAWEI_GPSDeviceDesc%         = GPS_DevInstall,  USB\VID_12D1&Subclass_12&Prot_14
+;%HUAWEI_PCVoiceDeviceDesc%     = PCVOICE_DevInstall, USB\VID_12D1&Subclass_12&Prot_15
+%HUAWEI_CDMAModemDesc%         = DIAG_DevInstall, USB\VID_12D1&Subclass_12&Prot_17
+%HUAWEI_PCUIDeviceDesc%        = PCUI_DevInstall, USB\VID_12D1&Subclass_12&Prot_22
+%DBAdapterDeviceDesc%          = DIAG_DevInstall, USB\VID_12D1&Subclass_12&Prot_23
+
+%HUAWEI_3GPCUIDeviceDesc%      = PCUI_DevInstall, USB\VID_12D1&Subclass_13&Prot_02
+%HUAWEI_3GDIAGDeviceDesc%      = DIAG_DevInstall, USB\VID_12D1&Subclass_13&Prot_03
+%HUAWEI_3GGPSDeviceDesc%       = GPS_DevInstall,  USB\VID_12D1&Subclass_13&Prot_05
+%HUAWEI_ControlDeviceDesc%     = CTRL_DevInstall, USB\VID_12D1&Subclass_13&Prot_06
+%HUAWEI_BTDeviceDesc%          = BT_DevInstall,   USB\VID_12D1&Subclass_13&Prot_0A
+%HUAWEI_PCUIDeviceDesc%        = PCUI_DevInstall, USB\VID_12D1&Subclass_13&Prot_12
+%HUAWEI_DIAGDeviceDesc%        = DIAG_DevInstall, USB\VID_12D1&Subclass_13&Prot_13
+%HUAWEI_GPSDeviceDesc%         = GPS_DevInstall,  USB\VID_12D1&Subclass_13&Prot_14
+;%HUAWEI_PCVoiceDeviceDesc%     = PCVOICE_DevInstall, USB\VID_12D1&Subclass_13&Prot_15
+%HUAWEI_CDMAModemDesc%         = DIAG_DevInstall, USB\VID_12D1&Subclass_13&Prot_17
+%HUAWEI_SKYTONEMDMDesc%        = PCUI_DevInstall, USB\VID_12D1&Subclass_13&Prot_1E
+%HUAWEI_PCUIDeviceDesc%        = PCUI_DevInstall, USB\VID_12D1&Subclass_13&Prot_22
+%DBAdapterDeviceDesc%          = DIAG_DevInstall, USB\VID_12D1&Subclass_13&Prot_23
+
+; for logo test
+%HUAWEI_PCUIDeviceDesc%      = PCUI_DevInstall, USB\VID_12D1&PID_105A&MI_01
+%HUAWEI_DIAGDeviceDesc%      = DIAG_DevInstall, USB\VID_12D1&PID_105A&MI_02
+
+[DIAG_DevInstall.NT]
+CopyFiles = DevInstall_CopyFiles
+AddReg = DevInstall_AddReg, DIAG_Identify_AddReg
+
+[PCUI_DevInstall.NT]
+CopyFiles = DevInstall_CopyFiles
+AddReg = DevInstall_AddReg, PCUI_Identify_AddReg
+
+[CTRL_DevInstall.NT]
+CopyFiles = DevInstall_CopyFiles
+AddReg = DevInstall_AddReg, CTRL_Identify_AddReg
+
+[BT_DevInstall.NT]
+CopyFiles = DevInstall_CopyFiles
+AddReg = DevInstall_AddReg, BT_Identify_AddReg
+
+[FP_DevInstall.NT]
+CopyFiles = DevInstall_CopyFiles
+AddReg = DevInstall_AddReg, FP_Identify_AddReg
+
+[PCVOICE_DevInstall.NT]
+CopyFiles = DevInstall_CopyFiles
+AddReg = DevInstall_AddReg, PCVOICE_Identify_AddReg
+
+[GPS_DevInstall.NT]
+CopyFiles = DevInstall_CopyFiles
+AddReg = DevInstall_AddReg, GPS_Identify_AddReg
+
+[SHELL_A_DevInstall.NT]
+CopyFiles = DevInstall_CopyFiles
+AddReg = DevInstall_AddReg, SHELL_A_Identify_AddReg
+
+[SHELL_B_DevInstall.NT]
+CopyFiles = DevInstall_CopyFiles
+AddReg = DevInstall_AddReg, SHELL_B_Identify_AddReg
+
+[SERIAL_A_DevInstall.NT]
+CopyFiles = DevInstall_CopyFiles
+AddReg = DevInstall_AddReg, SERIAL_A_Identify_AddReg
+
+[SERIAL_B_DevInstall.NT]
+CopyFiles = DevInstall_CopyFiles
+AddReg = DevInstall_AddReg, SERIAL_B_Identify_AddReg
+
+[SERIAL_C_DevInstall.NT]
+CopyFiles = DevInstall_CopyFiles
+AddReg = DevInstall_AddReg, SERIAL_C_Identify_AddReg
+
+[DevInstall_CopyFiles]
+hw_cdcacm.sys,,,0x6    ; COPYFLG_NOSKIP | COPYFLG_NOVERSIONCHECK
+
+[DIAG_DevInstall.NT.Services]
+AddService = %ServiceName%, 0x00000002, DevInstall_AddService 
+
+[PCUI_DevInstall.NT.Services]
+AddService = %ServiceName%, 0x00000002, DevInstall_AddService 
+
+[CTRL_DevInstall.NT.Services]
+AddService = %ServiceName%, 0x00000002, DevInstall_AddService 
+
+[BT_DevInstall.NT.Services]
+AddService = %ServiceName%, 0x00000002, DevInstall_AddService 
+
+[FP_DevInstall.NT.Services]
+AddService = %ServiceName%, 0x00000002, DevInstall_AddService 
+
+[PCVOICE_DevInstall.NT.Services]
+AddService = %ServiceName%, 0x00000002, DevInstall_AddService 
+
+[GPS_DevInstall.NT.Services]
+AddService = %ServiceName%, 0x00000002, DevInstall_AddService 
+
+[SHELL_A_DevInstall.NT.Services]
+AddService = %ServiceName%, 0x00000002, DevInstall_AddService 
+
+[SHELL_B_DevInstall.NT.Services]
+AddService = %ServiceName%, 0x00000002, DevInstall_AddService 
+
+[SERIAL_A_DevInstall.NT.Services]
+AddService = %ServiceName%, 0x00000002, DevInstall_AddService 
+
+[SERIAL_B_DevInstall.NT.Services]
+AddService = %ServiceName%, 0x00000002, DevInstall_AddService 
+
+[SERIAL_C_DevInstall.NT.Services]
+AddService = %ServiceName%, 0x00000002, DevInstall_AddService 
+
+[DevInstall_AddService]
+ServiceType   = 1                  ; SERVICE_KERNEL_DRIVER
+StartType     = 3                  ; SERVICE_DEMAND_START
+ErrorControl  = 1                  ; SERVICE_ERROR_NORMAL
+ServiceBinary = %12%\hw_cdcacm.sys
+Addreg = DevInstall_AddService_Addreg
+
+[DevInstall_AddService_Addreg]
+HKR, Parameters, DebugLevel, 0x00010001, 1
+HKR, Parameters, DebugPrintCom, 0x00010001, 0
+HKR, Parameters, ControlMask, 0x00010001, 0x00000001
+
+[DIAG_DevInstall.NT.HW]
+AddReg = DevInstall_NT_HW_AddReg
+
+[PCUI_DevInstall.NT.HW]
+AddReg = DevInstall_NT_HW_AddReg
+
+[CTRL_DevInstall.NT.HW]
+AddReg = DevInstall_NT_HW_AddReg
+
+[BT_DevInstall.NT.HW]
+AddReg = DevInstall_NT_HW_AddReg
+
+[FP_DevInstall.NT.HW]
+AddReg = DevInstall_NT_HW_AddReg
+
+[PCVOICE_DevInstall.NT.HW]
+AddReg = DevInstall_NT_HW_AddReg
+
+[GPS_DevInstall.NT.HW]
+AddReg = DevInstall_NT_HW_AddReg
+
+[SHELL_A_DevInstall.NT.HW]
+AddReg = DevInstall_NT_HW_AddReg
+
+[SHELL_B_DevInstall.NT.HW]
+AddReg = DevInstall_NT_HW_AddReg
+
+[SERIAL_A_DevInstall.NT.HW]
+AddReg = DevInstall_NT_HW_AddReg
+
+[SERIAL_B_DevInstall.NT.HW]
+AddReg = DevInstall_NT_HW_AddReg
+
+[SERIAL_C_DevInstall.NT.HW]
+AddReg = DevInstall_NT_HW_AddReg
+
+[DevInstall_NT_HW_AddReg]
+HKR,, "ReadBufferSize", 0x00010001, 0x10000 
+HKR,, "ReadBufferNumber", 0x00010001, 0x20
+HKR,, "MaxOutputTransferSize", 0x00010001, 0x1000
+HKR,, "ControlReuqestNumber", 0x00010001, 0x40
+HKR,, "DataRequestNumber", 0x00010001, 0x40
+HKR,, "SelectiveSuspendIdleTime", 0x00010001, 0x05
+
+;-------------- Add standard properties page (displayed in Device Manager)
+[DevInstall_AddReg]
+HKR,,PortSubClass,1,01 ; "01" stands for serial port
+HKR,,EnumPropPages32,,"MsPorts.dll,SerialPortPropPageProvider"
+
+[DIAG_Identify_AddReg]
+HKR,,PortIdentify,,HWDIAG 
+
+[PCUI_Identify_AddReg]
+HKR,,PortIdentify,,HWPCUI 
+
+[CTRL_Identify_AddReg]
+HKR,,PortIdentify,,HWCONTROL 
+
+[BT_Identify_AddReg]
+HKR,,PortIdentify,,HWBLUETOOTH 
+
+[FP_Identify_AddReg]
+HKR,,PortIdentify,,HWFINGERPRINT 
+
+[PCVOICE_Identify_AddReg]
+HKR,,PortIdentify,,HWPCVOICE 
+
+[GPS_Identify_AddReg]
+HKR,,PortIdentify,,HWGPS 
+
+[SHELL_A_Identify_AddReg]
+HKR,,PortIdentify,,HWSHELLA 
+
+[SHELL_B_Identify_AddReg]
+HKR,,PortIdentify,,HWSHELLB 
+
+[SERIAL_A_Identify_AddReg]
+HKR,,PortIdentify,,HWSERIALA 
+
+[SERIAL_B_Identify_AddReg]
+HKR,,PortIdentify,,HWSERIALB 
+
+[SERIAL_C_Identify_AddReg]
+HKR,,PortIdentify,,HWSERIALC 
+
+[Strings]
+
+HUAWEI_3GDIAGDeviceDesc     = "HUAWEI Mobile Connect - 3G Application Interface"
+HUAWEI_3GPCUIDeviceDesc     = "HUAWEI Mobile Connect - 3G PC UI Interface"
+HUAWEI_3GPCVoiceDeviceDesc  = "HUAWEI Mobile Connect - 3G PC Voice Interface"
+HUAWEI_3GGPSDeviceDesc      = "HUAWEI Mobile Connect - 3G GPS Interface"
+
+HUAWEI_PCUIDeviceDesc       = "Android Adapter PCUI"
+HUAWEI_PCVoiceDeviceDesc    = "HUAWEI Mobile Connect - PC Voice Interface"
+HUAWEI_GPSDeviceDesc        = "HUAWEI Mobile Connect - GPS Interface"
+HUAWEI_DIAGDeviceDesc       = "HUAWEI Mobile Connect - Application Interface"
+HUAWEI_FingerPintDesc       = "HUAWEI Mobile Connect - Fingerprint Interface"
+HUAWEI_BTDeviceDesc         = "HUAWEI Mobile Connect - Bluetooth Interface"
+HUAWEI_ControlDeviceDesc    = "HUAWEI Mobile Connect - Control Interface"
+HUAWEI_CDMAModemDesc        = "HUAWEI Mobile Connect - CDMA Modem Interface"
+
+3GDIAGDeviceDesc            = "Mobile Connect - 3G Application Interface"
+3GPCUIDeviceDesc            = "Mobile Connect - 3G PC UI Interface"
+3GGPSDeviceDesc             = "Mobile Connect - 3G GPS Interface"
+3GPCVoiceDeviceDesc         = "Mobile Connect - 3G PC Voice Interface"
+3GBTDeviceDesc              = "Mobile Connect - 3G Bluetooth Interface"
+3GControlDeviceDesc         = "Mobile Connect - 3G Control Interface"
+3GFingerPintDesc            = "Mobile Connect - 3G Fingerprint Interface"
+
+DIAGDeviceDesc              = "Mobile Connect - Application Interface"
+PCUIDeviceDesc              = "Mobile Connect - PC UI Interface"
+PCVoiceDeviceDesc           = "Mobile Connect - PC Voice Interface"
+GPSDeviceDesc               = "Mobile Connect - GPS Interface"
+DBAdapterDeviceDesc         = "DBAdapter Reserved Interface"
+HUAWEI_SKYTONEMDMDesc       = "HUAWEI Mobile Connect - SKYTONE Modem Interface"
+Mfg = "HUAWEI Technologies CO.,LTD"
+Disk_Description = "Huawei Driver Installation Disk"
+ServiceName = "hwusb_cdcacm"
+

@@ -1,0 +1,144 @@
+;
+; usbser.sys
+;
+
+[Version]
+Signature="$Windows NT$"
+Class=Ports
+ClassGuid={4D36E978-E325-11CE-BFC1-08002BE10318}
+Provider=%MEDIATEK%
+DriverVer=11/06/2014,2.0.1136.0
+CatalogFile   = cdc-acm.cat
+[Manufacturer]
+%MEDIATEK%=DeviceList,NTx86,NTamd64
+
+[DestinationDirs]
+DefaultDestDir=12
+
+
+;------------------------------------------------------------------------------
+;  Windows 2000/XP/Vista-32bit Sections
+;------------------------------------------------------------------------------
+
+[DriverInstall.nt]
+include=mdmcpq.inf
+AddReg=DriverInstall.nt.AddReg
+
+
+[DriverInstall.nt.AddReg]
+HKR,,DevLoader,,*ntkern
+HKR,,NTMPDriver,,USBSER.sys
+HKR,,EnumPropPages32,,"MsPorts.dll,SerialPortPropPageProvider"
+
+[DriverInstall.nt.Services]
+include=mdmcpq.inf 
+AddService=usbser, 0x00000002, DriverService.nt
+
+[DriverInstall.nt.HW]
+include=mdmcpq.inf
+
+
+[DriverService.nt]
+DisplayName=%SERVICE%
+ServiceType=1
+StartType=3
+ErrorControl=1
+ServiceBinary=%12%\USBSER.sys
+
+;------------------------------------------------------------------------------
+;  Vista/Win7-64bit Sections
+;------------------------------------------------------------------------------
+
+[DriverInstall.NTamd64]
+include=mdmcpq.inf
+AddReg=DriverInstall.NTamd64.AddReg
+
+[DriverInstall.NTamd64.AddReg]
+HKR,,DevLoader,,*ntkern
+HKR,,NTMPDriver,,USBSER.sys
+HKR,,EnumPropPages32,,"MsPorts.dll,SerialPortPropPageProvider"
+
+[DriverInstall.NTamd64.Services]
+include=mdmcpq.inf 
+AddService=usbser, 0x00000002, DriverService.NTamd64
+
+[DriverInstall.NTamd64.HW]
+include=mdmcpq.inf
+
+[DriverService.NTamd64]
+DisplayName=%SERVICE%
+ServiceType=1
+StartType=3
+ErrorControl=1
+ServiceBinary=%12%\USBSER.sys
+
+
+;------------------------------------------------------------------------------
+;  Vendor and Product ID Definitions
+;------------------------------------------------------------------------------
+
+[DeviceList.NTx86]
+; BootRom & Preloader VCOM
+%VCOM_BOOTROM%=DriverInstall, USB\Vid_0e8d&Pid_0003
+%VCOM_PRELOADER%=DriverInstall, USB\Vid_0e8d&Pid_2000
+%VCOM_DA%=DriverInstall, USB\Vid_0e8d&Pid_2001
+%VCOM_DA%=DriverInstall, USB\Vid_0e8d&Pid_2007
+
+%VCOM%=DriverInstall, USB\VID_12D1&PID_0005&MI_02
+%VCOM%=DriverInstall, USB\VID_12D1&PID_0006
+%VCOM%=DriverInstall, USB\VID_12D1&PID_1068&MI_01
+%VCOM%=DriverInstall, USB\VID_12D1&PID_1069&MI_01
+%VCOM%=DriverInstall, USB\VID_12D1&PID_106A
+%VCOM%=DriverInstall, USB\VID_12D1&PID_106B&MI_00
+%VCOM%=DriverInstall, USB\VID_12D1&PID_1070&MI_02
+%VCOM%=DriverInstall, USB\VID_12D1&PID_200A&MI_02
+%VCOM%=DriverInstall, USB\VID_12D1&PID_200D&MI_02
+%VCOM%=DriverInstall, USB\VID_12D1&PID_200E&MI_01
+%VCOM%=DriverInstall, USB\VID_12D1&PID_200F&MI_01
+%VCOM%=DriverInstall, USB\VID_12D1&PID_2010&MI_03
+%VCOM%=DriverInstall, USB\VID_12D1&PID_2011&MI_02
+%VCOM%=DriverInstall, USB\VID_12D1&PID_2012&MI_01
+%VCOM%=DriverInstall, USB\VID_12D1&PID_2013&MI_01
+%VCOM%=DriverInstall, USB\VID_12D1&PID_2018&MI_02
+%VCOM%=DriverInstall, USB\VID_12D1&PID_2019&MI_03
+%VCOM%=DriverInstall, USB\VID_12D1&PID_201A&MI_02
+%VCOM%=DriverInstall, USB\VID_12D1&PID_201B&MI_03
+
+[DeviceList.NTamd64]
+; BootRom & Preloader VCOM
+%VCOM_BOOTROM%=DriverInstall, USB\Vid_0e8d&Pid_0003
+%VCOM_PRELOADER%=DriverInstall, USB\Vid_0e8d&Pid_2000
+%VCOM_DA%=DriverInstall, USB\Vid_0e8d&Pid_2001
+
+%VCOM%=DriverInstall, USB\VID_12D1&PID_0005&MI_02
+%VCOM%=DriverInstall, USB\VID_12D1&PID_0006
+%VCOM%=DriverInstall, USB\VID_12D1&PID_1068&MI_01
+%VCOM%=DriverInstall, USB\VID_12D1&PID_1069&MI_01
+%VCOM%=DriverInstall, USB\VID_12D1&PID_106A
+%VCOM%=DriverInstall, USB\VID_12D1&PID_106B&MI_00
+%VCOM%=DriverInstall, USB\VID_12D1&PID_1070&MI_02
+%VCOM%=DriverInstall, USB\VID_12D1&PID_200A&MI_02
+%VCOM%=DriverInstall, USB\VID_12D1&PID_200D&MI_02
+%VCOM%=DriverInstall, USB\VID_12D1&PID_200E&MI_01
+%VCOM%=DriverInstall, USB\VID_12D1&PID_200F&MI_01
+%VCOM%=DriverInstall, USB\VID_12D1&PID_2010&MI_03
+%VCOM%=DriverInstall, USB\VID_12D1&PID_2011&MI_02
+%VCOM%=DriverInstall, USB\VID_12D1&PID_2012&MI_01
+%VCOM%=DriverInstall, USB\VID_12D1&PID_2013&MI_01
+%VCOM%=DriverInstall, USB\VID_12D1&PID_2018&MI_02
+%VCOM%=DriverInstall, USB\VID_12D1&PID_2019&MI_03
+%VCOM%=DriverInstall, USB\VID_12D1&PID_201A&MI_02
+%VCOM%=DriverInstall, USB\VID_12D1&PID_201B&MI_03
+
+;------------------------------------------------------------------------------
+;  String Definitions
+;------------------------------------------------------------------------------
+
+[Strings]
+MEDIATEK            = "MediaTek Inc."
+GADGET              = "Android Gadget VCOM Driver"
+SERVICE             = "USB RS-232 Emulation Driver"
+VCOM_BOOTROM        = "MediaTek USB Port"
+VCOM_PRELOADER      = "MediaTek PreLoader USB VCOM (Android)"
+VCOM_DA        	    = "MediaTek DA USB VCOM (Android)"
+VCOM                = "MediaTek USB VCOM (Android)"

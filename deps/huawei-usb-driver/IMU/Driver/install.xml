@@ -1,0 +1,707 @@
+<xml>
+    <HandSetDriverVersion>
+        <DriverVersion>2.01.02.00</DriverVersion>
+        <ConfigVersion>1.0.0.0</ConfigVersion>
+    </HandSetDriverVersion>
+
+    <install>
+        <system version="WinXp">
+        
+            <inf>
+                 <file desc="SWITCH">
+                         <name>hw_usbdev.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="SERIAL">
+                         <name>hw_quser.inf</name>
+                         <flag>0</flag>
+                 </file> 
+                 <file desc="MODEM">
+                         <name>hw_qumdm.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="GOADB">
+                         <name>hw_goadb.inf</name>
+                         <flag>0</flag>
+                 </file>     
+                 <file desc="GOHDB">
+                         <name>hw_gohdb.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="NDIS">
+                         <name>hw_quusbnet.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="RNDIS">
+                         <name>WceIS.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="MTP">
+                         <name>mtp.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="MTKVCOM">
+                         <name>cdc-acm.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="FILTER">
+                         <name>ew_usbccgpfilter.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="SEARIAL">
+                         <name>hw_cdcacm.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="MODEM">
+                         <name>hw_cdcmdm.inf</name>
+                         <flag>0</flag>
+                 </file> 
+            </inf>
+            
+            <sys>
+                 <file desc="SWITCH">
+                         <name>hw_usbdev.sys</name>
+                         <path>\system32\drivers</path>
+                         <delete>1</delete>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="SERIAL">
+                         <name>hw_quusbmdm.sys</name>
+                         <path>\system32\drivers</path>
+                         <delete>1</delete>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="NDIS">
+                         <name>hw_quusbnet.sys</name>
+                         <path>\system32\drivers</path>
+                         <delete>1</delete>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="MTKVCOM">
+                         <name>usbser.sys</name>
+                         <path>\system32\drivers</path>
+                        <delete>1</delete>
+                         <flag>0</flag>
+                 </file> 
+                 <file desc="FILTER">
+                         <name>ew_usbccgpfilter.sys</name>
+                         <path>\system32\drivers</path>
+                         <delete>1</delete>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="SERIAL">
+                         <name>hw_cdcacm.sys</name>
+                         <path>\system32\drivers</path>
+                         <delete>1</delete>
+                         <flag>0</flag>
+                 </file>
+            </sys>
+            
+            <dll>
+                 <file desc="COINSTALLER">
+                         <name>WdfCoInstaller01009.dll</name>
+                         <path>\system32\drivers</path> 
+                         <delete>0</delete>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="UDFUPDATE">
+                         <name>WUDFUpdate_01009.dll</name>
+                         <path>\system32\drivers</path>
+                         <delete>0</delete>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="USBCOINSTALLER">
+                         <name>WinUSBCoInstaller2.dll</name>
+                         <path>\system32\drivers</path>
+                         <delete>0</delete>
+                         <flag>0</flag>
+                 </file>
+            </dll>
+            <pid>
+                 <file desc="SP"><name>vid_12d1&pid_1030</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="SP"><name>vid_12d1&pid_1031</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="SP"><name>vid_12d1&pid_1034</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="SP"><name>vid_12d1&pid_1035</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="SP"><name>vid_12d1&pid_1038</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="SP"><name>vid_12d1&pid_1073</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1074</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1075</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1076</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1077</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1078</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1079</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_107A</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_107B</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_107C</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_105C</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1080</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1081</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1082</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1057</name><delete>1</delete><flag>0</flag></file>  
+                 <file desc="SP"><name>vid_12d1&pid_1058</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_107D</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_107E</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_107F</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_108A</name><delete>1</delete><flag>0</flag></file>
+				 
+                 <file desc="TI"><name>vid_12d1&pid_1051</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="TI"><name>vid_12d1&pid_1052</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="TI"><name>vid_12d1&pid_1054</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="TI"><name>vid_12d1&pid_1055</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="TI"><name>vid_12d1&pid_1056</name><delete>1</delete><flag>0</flag></file>                 
+
+                 <file desc="FP"><name>vid_12d1&pid_1802</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="FP"><name>vid_12d1&pid_1803</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="FP"><name>vid_12d1&pid_1804</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="FP"><name>vid_12d1&pid_1805</name><delete>1</delete><flag>0</flag></file>
+                                  
+                 <file desc="FWT"><name>vid_12d1&pid_1010</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="FWT"><name>vid_12d1&pid_1011</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="FWT"><name>vid_12d1&pid_101d</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="FWT"><name>vid_12d1&pid_101e</name><delete>1</delete><flag>0</flag></file>
+                                  
+                 <file desc="HID"><name>vid_12d1&pid_3601</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3610</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3611</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3612</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3613</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3614</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3617</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3618</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3619</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3622</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3629</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_360a</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_360e</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_360f</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_361f</name><delete>1</delete><flag>0</flag></file>                 
+                 
+            </pid>      
+             
+                                  <parameter>
+
+                                  </parameter>   
+
+        </system>
+
+    		<system version="WinVista">
+    		
+            <inf>
+                 <file desc="SWITCH">
+                         <name>hw_usbdev.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="SERIAL">
+                         <name>hw_quser.inf</name>
+                         <flag>0</flag>
+                 </file> 
+                 <file desc="MODEM">
+                         <name>hw_qumdm.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="GOADB">
+                         <name>hw_goadb.inf</name>
+                         <flag>0</flag>
+                 </file>     
+                 <file desc="GOHDB">
+                         <name>hw_gohdb.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="NDIS">
+                         <name>hw_quusbnet.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="MTKVCOM">
+                         <name>cdc-acm.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="FILTER">
+                         <name>ew_usbccgpfilter.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="SEARIAL">
+                         <name>hw_cdcacm.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="MODEM">
+                         <name>hw_cdcmdm.inf</name>
+                         <flag>0</flag>
+                 </file> 
+                 <file desc="MTP">
+                         <name>mtp.inf</name>
+                         <flag>0</flag>
+                 </file>
+            </inf>
+            
+            <sys>
+                 <file desc="SWITCH">
+                         <name>hw_usbdev.sys</name>
+                         <path>\system32\drivers</path>
+                         <delete>1</delete>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="SERIAL">
+                         <name>hw_quusbmdm.sys</name>
+                         <path>\system32\drivers</path>
+                         <delete>1</delete>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="NDIS">
+                         <name>hw_quusbnet.sys</name>
+                         <path>\system32\drivers</path>
+                         <delete>1</delete>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="MTKVCOM">
+                         <name>usbser.sys</name>
+                         <path>\system32\drivers</path>
+                        <delete>1</delete>
+                         <flag>0</flag>
+                 </file> 
+                 <file desc="FILTER">
+                         <name>ew_usbccgpfilter.sys</name>
+                         <path>\system32\drivers</path>
+                         <delete>1</delete>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="SERIAL">
+                         <name>hw_cdcacm.sys</name>
+                         <path>\system32\drivers</path>
+                         <delete>1</delete>
+                         <flag>0</flag>
+                 </file>
+            </sys>
+            
+            <dll>
+                 <file desc="COINSTALLER">
+                         <name>WdfCoInstaller01009.dll</name>
+                         <path>\system32\drivers</path> 
+                         <delete>0</delete>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="UDFUPDATE">
+                         <name>WUDFUpdate_01009.dll</name>
+                         <path>\system32\drivers</path>
+                         <delete>0</delete>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="USBCOINSTALLER">
+                         <name>WinUSBCoInstaller2.dll</name>
+                         <path>\system32\drivers</path>
+                         <delete>0</delete>
+                         <flag>0</flag>
+                 </file>
+            </dll>
+
+            <pid>
+                 <file desc="SP"><name>vid_12d1&pid_1030</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="SP"><name>vid_12d1&pid_1031</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="SP"><name>vid_12d1&pid_1034</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="SP"><name>vid_12d1&pid_1035</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="SP"><name>vid_12d1&pid_1038</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="SP"><name>vid_12d1&pid_1073</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1074</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1075</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1076</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1077</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1078</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1079</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_107A</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_107B</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_107C</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_105C</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1080</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1081</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1082</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1057</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1058</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_107D</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_107E</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_107F</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_108A</name><delete>1</delete><flag>0</flag></file>
+
+                 <file desc="TI"><name>vid_12d1&pid_1051</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="TI"><name>vid_12d1&pid_1052</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="TI"><name>vid_12d1&pid_1054</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="TI"><name>vid_12d1&pid_1055</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="TI"><name>vid_12d1&pid_1056</name><delete>1</delete><flag>0</flag></file>                 
+
+                 <file desc="FP"><name>vid_12d1&pid_1802</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="FP"><name>vid_12d1&pid_1803</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="FP"><name>vid_12d1&pid_1804</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="FP"><name>vid_12d1&pid_1805</name><delete>1</delete><flag>0</flag></file>
+                                  
+                 <file desc="FWT"><name>vid_12d1&pid_1010</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="FWT"><name>vid_12d1&pid_1011</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="FWT"><name>vid_12d1&pid_101d</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="FWT"><name>vid_12d1&pid_101e</name><delete>1</delete><flag>0</flag></file>
+                                  
+                 <file desc="HID"><name>vid_12d1&pid_3601</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3610</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3611</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3612</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3613</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3614</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3617</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3618</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3619</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3622</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3629</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_360a</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_360e</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_360f</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_361f</name><delete>1</delete><flag>0</flag></file>                 
+                 
+            </pid>      
+                              
+                                  <parameter>
+
+                                  </parameter>    
+
+        </system>
+
+       <system version="Win7">
+       
+            <inf>
+                 <file desc="SWITCH">
+                         <name>hw_usbdev.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="SERIAL">
+                         <name>hw_quser.inf</name>
+                         <flag>0</flag>
+                 </file> 
+                 <file desc="MODEM">
+                         <name>hw_qumdm.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="GOADB">
+                         <name>hw_goadb.inf</name>
+                         <flag>0</flag>
+                 </file>     
+                 <file desc="GOHDB">
+                         <name>hw_gohdb.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="NDIS">
+                         <name>hw_quusbnet.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="MTKVCOM">
+                         <name>cdc-acm.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="FILTER">
+                         <name>ew_usbccgpfilter.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="SEARIAL">
+                         <name>hw_cdcacm.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="MODEM">
+                         <name>hw_cdcmdm.inf</name>
+                         <flag>0</flag>
+                 </file> 
+                 <file desc="MTP">
+                         <name>mtp.inf</name>
+                         <flag>0</flag>
+                 </file>
+            </inf>
+            
+            <sys>
+                 <file desc="SWITCH">
+                         <name>hw_usbdev.sys</name>
+                         <path>\system32\drivers</path>
+                         <delete>1</delete>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="SERIAL">
+                         <name>hw_quusbmdm.sys</name>
+                         <path>\system32\drivers</path>
+                         <delete>1</delete>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="NDIS">
+                         <name>hw_quusbnet.sys</name>
+                         <path>\system32\drivers</path>
+                         <delete>1</delete>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="MTKVCOM">
+                         <name>usbser.sys</name>
+                         <path>\system32\drivers</path>
+                        <delete>1</delete>
+                         <flag>0</flag>
+                 </file> 
+                 <file desc="FILTER">
+                         <name>ew_usbccgpfilter.sys</name>
+                         <path>\system32\drivers</path>
+                         <delete>1</delete>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="SERIAL">
+                         <name>hw_cdcacm.sys</name>
+                         <path>\system32\drivers</path>
+                         <delete>1</delete>
+                         <flag>0</flag>
+                 </file>
+            </sys>
+            
+            <dll>
+                 <file desc="COINSTALLER">
+                         <name>WdfCoInstaller01009.dll</name>
+                         <path>\system32\drivers</path> 
+                         <delete>0</delete>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="UDFUPDATE">
+                         <name>WUDFUpdate_01009.dll</name>
+                         <path>\system32\drivers</path>
+                         <delete>0</delete>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="USBCOINSTALLER">
+                         <name>WinUSBCoInstaller2.dll</name>
+                         <path>\system32\drivers</path>
+                         <delete>0</delete>
+                         <flag>0</flag>
+                 </file>
+            </dll>
+
+                              
+            <pid>
+                 <file desc="SP"><name>vid_12d1&pid_1030</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="SP"><name>vid_12d1&pid_1031</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="SP"><name>vid_12d1&pid_1034</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="SP"><name>vid_12d1&pid_1035</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="SP"><name>vid_12d1&pid_1038</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="SP"><name>vid_12d1&pid_1073</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1074</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1075</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1076</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1077</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1078</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1079</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_107A</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_107B</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_107C</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_105C</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1080</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1081</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1082</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_1058</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_107D</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_107E</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_107F</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_108A</name><delete>1</delete><flag>0</flag></file>
+				 
+                 <file desc="TI"><name>vid_12d1&pid_1051</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="TI"><name>vid_12d1&pid_1052</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="TI"><name>vid_12d1&pid_1054</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="TI"><name>vid_12d1&pid_1055</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="TI"><name>vid_12d1&pid_1056</name><delete>1</delete><flag>0</flag></file>                 
+
+                 <file desc="FP"><name>vid_12d1&pid_1802</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="FP"><name>vid_12d1&pid_1803</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="FP"><name>vid_12d1&pid_1804</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="FP"><name>vid_12d1&pid_1805</name><delete>1</delete><flag>0</flag></file>
+                                  
+                 <file desc="FWT"><name>vid_12d1&pid_1010</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="FWT"><name>vid_12d1&pid_1011</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="FWT"><name>vid_12d1&pid_101d</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="FWT"><name>vid_12d1&pid_101e</name><delete>1</delete><flag>0</flag></file>
+                                  
+                 <file desc="HID"><name>vid_12d1&pid_3601</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3610</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3611</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3612</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3613</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3614</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3617</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3618</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3619</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3622</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3629</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_360a</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_360e</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_360f</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_361f</name><delete>1</delete><flag>0</flag></file>                 
+                 
+            </pid>      
+                          <parameter>
+                         </parameter>
+        </system>
+
+       <system version="Win8">
+       
+            <inf>
+                 <file desc="SWITCH">
+                         <name>hw_usbdev.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="SERIAL">
+                         <name>hw_quser.inf</name>
+                         <flag>0</flag>
+                 </file> 
+                 <file desc="MODEM">
+                         <name>hw_qumdm.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="GOADB">
+                         <name>hw_goadb.inf</name>
+                         <flag>0</flag>
+                 </file>     
+                 <file desc="GOHDB">
+                         <name>hw_gohdb.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="NDIS">
+                         <name>hw_quusbnet.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="MTKVCOM">
+                         <name>cdc-acm.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="FILTER">
+                         <name>ew_usbccgpfilter.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="SEARIAL">
+                         <name>hw_cdcacm.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="MODEM">
+                         <name>hw_cdcmdm.inf</name>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="MTP">
+                         <name>mtp.inf</name>
+                         <flag>0</flag>
+                 </file> 
+            </inf>
+
+            <sys>
+                 <file desc="SWITCH">
+                         <name>hw_usbdev.sys</name>
+                         <path>\system32\drivers</path>
+                         <delete>1</delete>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="SERIAL">
+                         <name>hw_quusbmdm.sys</name>
+                         <path>\system32\drivers</path>
+                         <delete>1</delete>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="NDIS">
+                         <name>hw_quusbnet.sys</name>
+                         <path>\system32\drivers</path>
+                         <delete>1</delete>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="MTKVCOM">
+                         <name>usbser.sys</name>
+                         <path>\system32\drivers</path>
+                        <delete>1</delete>
+                         <flag>0</flag>
+                 </file> 
+                 <file desc="FILTER">
+                         <name>ew_usbccgpfilter.sys</name>
+                         <path>\system32\drivers</path>
+                         <delete>1</delete>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="SERIAL">
+                         <name>hw_cdcacm.sys</name>
+                         <path>\system32\drivers</path>
+                         <delete>1</delete>
+                         <flag>0</flag>
+                 </file>
+            </sys>
+            
+            <dll>
+                 <file desc="COINSTALLER">
+                         <name>WdfCoInstaller01009.dll</name>
+                         <path>\system32\drivers</path> 
+                         <delete>0</delete>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="UDFUPDATE">
+                         <name>WUDFUpdate_01009.dll</name>
+                         <path>\system32\drivers</path>
+                         <delete>0</delete>
+                         <flag>0</flag>
+                 </file>
+                 <file desc="USBCOINSTALLER">
+                         <name>WinUSBCoInstaller2.dll</name>
+                         <path>\system32\drivers</path>
+                         <delete>0</delete>
+                         <flag>0</flag>
+                 </file>
+            </dll>
+
+
+            <pid>
+                 <file desc="SP"><name>vid_12d1&pid_1030</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="SP"><name>vid_12d1&pid_1031</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="SP"><name>vid_12d1&pid_1034</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="SP"><name>vid_12d1&pid_1035</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="SP"><name>vid_12d1&pid_1038</name><delete>1</delete><flag>0</flag></file>                 
+
+                 <file desc="TI"><name>vid_12d1&pid_1051</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="TI"><name>vid_12d1&pid_1052</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="TI"><name>vid_12d1&pid_1054</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="TI"><name>vid_12d1&pid_1055</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="TI"><name>vid_12d1&pid_1056</name><delete>1</delete><flag>0</flag></file>                 
+
+                 <file desc="FP"><name>vid_12d1&pid_1802</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="FP"><name>vid_12d1&pid_1803</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="FP"><name>vid_12d1&pid_1804</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="FP"><name>vid_12d1&pid_1805</name><delete>1</delete><flag>0</flag></file>
+                                  
+                 <file desc="FWT"><name>vid_12d1&pid_1010</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="FWT"><name>vid_12d1&pid_1011</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="FWT"><name>vid_12d1&pid_101d</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="FWT"><name>vid_12d1&pid_101e</name><delete>1</delete><flag>0</flag></file>
+                                  
+                 <file desc="HID"><name>vid_12d1&pid_3601</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3610</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3611</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3612</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3613</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3614</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3617</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3618</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3619</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3622</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_3629</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_360a</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_360e</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_360f</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="HID"><name>vid_12d1&pid_361f</name><delete>1</delete><flag>0</flag></file>                 
+                 
+                 <file desc="SP"><name>vid_12d1&pid_1073</name><delete>1</delete><flag>0</flag></file>                  
+                 <file desc="SP"><name>vid_12d1&pid_1074</name><delete>1</delete><flag>0</flag></file>                  
+                 <file desc="SP"><name>vid_12d1&pid_1075</name><delete>1</delete><flag>0</flag></file>                  
+                 <file desc="SP"><name>vid_12d1&pid_1076</name><delete>1</delete><flag>0</flag></file>                  
+                 <file desc="SP"><name>vid_12d1&pid_1077</name><delete>1</delete><flag>0</flag></file>                  
+                 <file desc="SP"><name>vid_12d1&pid_1078</name><delete>1</delete><flag>0</flag></file>                  
+                 <file desc="SP"><name>vid_12d1&pid_1079</name><delete>1</delete><flag>0</flag></file>                  
+                 <file desc="SP"><name>vid_12d1&pid_107a</name><delete>1</delete><flag>0</flag></file>                  
+                 <file desc="SP"><name>vid_12d1&pid_1080</name><delete>1</delete><flag>0</flag></file>                  
+                 <file desc="SP"><name>vid_12d1&pid_1081</name><delete>1</delete><flag>0</flag></file> 
+                 <file desc="SP"><name>vid_12d1&pid_1082</name><delete>1</delete><flag>0</flag></file>                 
+                 <file desc="SP"><name>vid_12d1&pid_1058</name><delete>1</delete><flag>0</flag></file>                   
+                 <file desc="SP"><name>vid_12d1&pid_107D</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_107E</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_107F</name><delete>1</delete><flag>0</flag></file>
+                 <file desc="SP"><name>vid_12d1&pid_108A</name><delete>1</delete><flag>0</flag></file>
+            </pid>      
+                     <parameter>
+                     </parameter>
+        </system>
+    </install> 
+              
+</xml>
