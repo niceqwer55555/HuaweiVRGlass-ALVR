@@ -154,6 +154,12 @@ foreach ($p in $registered) {
     # Never keep a driver registered from a packaging output directory: those
     # are temporary build artifacts and vanish when the folder is cleaned.
     if ($n.Contains('\build\end\')) { Say "  skip temp build path: $p" 'DarkGray'; continue }
+    # Drop stale registrations pointing at missing folders (e.g. an old
+    # driver4VR install). SteamVR rewrites the whole external_drivers table
+    # when it hits one of these, wiping our HMD driver registration too.
+    if (-not (Test-Path -LiteralPath $p -PathType Container)) {
+        Say "  skip stale missing path: $p" 'DarkGray'; continue
+    }
     if ($dropNorm -contains $n) { continue }   # drop inactive HMD driver
     if (-not $newList.Contains($p)) { $newList.Add($p) }
 }

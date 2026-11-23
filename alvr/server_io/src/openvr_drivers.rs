@@ -419,6 +419,10 @@ pub fn apply_driver_registration_for_mode(
     };
     registered.retain(|p| {
         if is_temp_build_path(p) { return false; }   // never persist temp package paths
+        // Drop stale registrations pointing at missing folders. SteamVR rewrites
+        // the whole external_drivers table when it hits one of these, wiping
+        // our HMD driver registration and showing "headset not connected".
+        if !p.is_dir() { return false; }
         let resolved = std::fs::canonicalize(p).unwrap_or_else(|_| p.clone());
         !drop_paths.iter().any(|d| {
             let rd = std::fs::canonicalize(d).unwrap_or_else(|_| d.clone());
