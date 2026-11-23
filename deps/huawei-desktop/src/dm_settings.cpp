@@ -269,9 +269,9 @@ void DmSettingsDefault(DmSettings* s) {
     s->ipdMm = 40.0f;
     s->fovTanX = 1.0f;             // 90°
     s->fovTanY = 1.0f;
-    s->rollLeft = 0.0f;
-    s->rollRight = 0.0f;
-    s->flip180 = 1;
+    s->rollLeft = -90.0f;          // 每眼各向下旋转90°（替代整幅 flip180，画面等效转正）
+    s->rollRight = -90.0f;
+    s->flip180 = 0;                // 不再整幅翻转：改用上面每眼 roll
     s->invertPose = 1;
     s->invertYaw = 0;
     s->invertPitch = 0;
@@ -290,8 +290,8 @@ void DmSettingsDefault(DmSettings* s) {
     s->panX = 0.0f; s->panY = 0.0f;
     s->panoKind = 0;
     s->followRangeDeg = 20.0f;// 跟随触发范围
-    s->eyeRot[0] = 90.0f;          // 两眼各再 +90°（整幅向上翻转后画面转正）
-    s->eyeRot[1] = 270.0f;         // 与左眼相差 180°（面板+镜片的物理特性，必须保持）
+    s->eyeRot[0] = 0.0f;           // 官方基准：贴屏不额外转（每眼朝向改用 roll 实现）
+    s->eyeRot[1] = 180.0f;         // 与左眼相差 180°（面板+镜片的物理特性，必须保持）
     s->eyeMirrorX[0] = s->eyeMirrorX[1] = 0;
     s->eyeMirrorY[0] = s->eyeMirrorY[1] = 0;
     s->eyeDx[0] = s->eyeDx[1] = 0.0f;
