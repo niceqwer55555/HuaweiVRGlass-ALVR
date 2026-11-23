@@ -1,6 +1,7 @@
 // dm_capture.cpp
 #include "dm_capture.h"
 #include "dm_log.h"
+#include "dm_settings.h"
 #include <dxgi1_2.h>
 #include <stdio.h>
 
@@ -147,8 +148,35 @@ void DmCapture::UpdateCursor(ID3D11Device* d) {
     POINT p;
     if (!GetCursorPos(&p)) { curVisible = false; return; }
     if (p.x < rect.left || p.x >= rect.right || p.y < rect.top || p.y >= rect.bottom) { curVisible = false; return; }
-    curU = (float)(p.x - rect.left) / (float)(rect.right - rect.left);
-    curV = (float)(p.y - rect.top) / (float)(rect.bottom - rect.top);
+    float lu = (float)(p.x - rect.left) / (float)(rect.right - rect.left);  // logical 0..1 (rect space)
+    float lv = (float)(p.y - rect.top) / (float)(rect.bottom - rect.top);
+    // Some panels (e.g. Steam Deck portrait 800x1280 reported as landscape
+    // 1280x800 by the EDID) give a DDA texture whose W/H are SWAPPED relative
+    // to the logical monitor rect. The texture is the desktop rotated 90deg,
+    // so the cursor UV must be mapped into that rotated texture space.
+    // Without this the cursor lands at the wrong spot (mirrored/rotated).
+    float rw = (float)(rect.right - rect.left), rh = (float)(rect.bottom - rect.top);
+    bool swapped = (w > 0 && h > 0 && rw > 0 && rh > 0) &&
+                   ((w > h) != (rw > rh));   // texture orientation differs from rect
+    curSwapped = swapped;
+    if (swapped) {
+        // DDA texture W/H are swapped vs the logical monitor (portrait panel
+        // reported as landscape). Pick the mapping via ini [display] cursor_rot:
+        //   0: u=lv,   v=1-lu
+        //   1: u=1-lv, v=lu
+        //   2: u=1-lv, v=1-lu
+        //   3: u=lv,   v=lu
+        int rot = GetPrivateProfileIntW(L"display", L"cursor_rot", 0, DmIniPath().c_str());
+        switch (rot) {
+        case 1:  curU = 1.0f - lv; curV = lu;        break;
+        case 2:  curU = 1.0f - lv; curV = 1.0f - lu; break;
+        case 3:  curU = lv;        curV = lu;        break;
+        default: curU = lv;        curV = 1.0f - lu; break;
+        }
+    } else {
+        curU = lu;
+        curV = lv;
+    }
     curVisible = true;
 
     if (ci.hCursor == curHandle && curSrv) return;

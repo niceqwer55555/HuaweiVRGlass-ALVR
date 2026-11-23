@@ -37,8 +37,9 @@ struct DmCapture {
     uint32_t curW = 0, curH = 0, curHotX = 0, curHotY = 0;
     HCURSOR curHandle = NULL;
     bool curVisible = false;
-    float curU = 0, curV = 0;      // 0..1 相对屏幕
+    float curU = 0, curV = 0;      // 0..1 相对屏幕（纹理空间）
     float curAspect = 1.0f;        // 宽/高
+    bool  curSwapped = false;      // 纹理相对逻辑显示器旋转了90°（宽高互换）
 
     bool Start(ID3D11Device* d, ID3D11DeviceContext* c, int monitorIndex, std::string* err);
     void Stop();
