@@ -14,6 +14,9 @@ use std::{
 pub const ALVR_DRIVER_NAME: &str = "alvr_server";
 /// Name declared in the Huawei VR Glass official (wired) driver manifest
 pub const HUAWEI_DRIVER_NAME: &str = "huaweiVR";
+/// Sidecar (next to the dashboard exe) remembering all discovered HMD driver
+/// paths so switching the load list never loses the inactive driver's path.
+const HMD_DRIVERS_FILE: &str = "hmd_drivers.json";
 
 pub fn get_registered_drivers() -> Result<Vec<PathBuf>> {
     Ok(openvrpaths::from_openvr_paths(
@@ -321,6 +324,97 @@ pub fn register_bundled_huawei_driver(dir: &std::path::Path) -> Result<()> {
         driver_registration(&duplicates, false)?;
     }
     driver_registration(&[wanted], true)
+}
+
+/// Which HMD driver should be present in SteamVR's external driver load list.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum HmdDriver {
+    Alvr,
+    Huawei,
+}
+
+/// Make SteamVR's load list (openvrpaths.vrpath `external_drivers`) contain only
+/// the HMD driver matching the current physical connection. Third-party drivers
+/// (driver4VR, etc.) are left untouched. Both HMD driver paths are remembered
+/// in a sidecar file so the inactive one can be restored on the next switch,
+/// even if it is currently absent from the load list.
+///
+/// `alvr_dir` and `huawei_dir` are the canonical paths we own; they are always
+/// recorded so switching back works. SteamVR reads the load list at startup,
+/// so callers should invoke this before launching it.
+pub fn apply_driver_registration_for_mode(
+    keep: HmdDriver,
+    alvr_dir: &std::path::Path,
+    huawei_dir: &std::path::Path,
+    storage_dir: &std::path::Path,
+) -> Result<()> {
+    let keep_dir = match keep {
+        HmdDriver::Alvr => alvr_dir,
+        HmdDriver::Huawei => huawei_dir,
+    };
+
+    // Remember every HMD driver path ever seen, so switching the load list is
+    // reversible even after the inactive driver was removed from it.
+    let sidecar = storage_dir.join(HMD_DRIVERS_FILE);
+    let mut known_alvr: Vec<PathBuf> = vec![];
+    let mut known_huawei: Vec<PathBuf> = vec![];
+    if let Ok(text) = fs::read_to_string(&sidecar) {
+        if let Ok(v) = json::from_str::<json::Value>(&text) {
+            for (key, out) in [("alvr", &mut known_alvr), ("huawei", &mut known_huawei)] {
+                if let Some(arr) = v.get(key).and_then(|x| x.as_array()) {
+                    for item in arr {
+                        if let Some(s) = item.as_str() {
+                            out.push(PathBuf::from(s));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    let mut registered = get_registered_drivers()?;
+    for p in &registered {
+        match driver_name_of(p).as_deref() {
+            Some(ALVR_DRIVER_NAME) if !known_alvr.contains(p) => known_alvr.push(p.clone()),
+            Some(HUAWEI_DRIVER_NAME) if !known_huawei.contains(p) => known_huawei.push(p.clone()),
+            _ => {}
+        }
+    }
+    for p in [alvr_dir, huawei_dir] {
+        let list = if p == alvr_dir { &mut known_alvr } else { &mut known_huawei };
+        if !list.contains(&p.to_path_buf()) { list.push(p.to_path_buf()); }
+    }
+    let _ = fs::write(
+        &sidecar,
+        json::to_string_pretty(&json::json!({
+            "alvr": known_alvr,
+            "huawei": known_huawei,
+        }))?,
+    );
+
+    // Drop every known inactive HMD path from the load list; keep third-party
+    // drivers and all of the active driver's copies.
+    let drop_paths = match keep {
+        HmdDriver::Alvr => &known_huawei,
+        HmdDriver::Huawei => &known_alvr,
+    };
+    registered.retain(|p| {
+        let resolved = std::fs::canonicalize(p).unwrap_or_else(|_| p.clone());
+        !drop_paths.iter().any(|d| {
+            let rd = std::fs::canonicalize(d).unwrap_or_else(|_| d.clone());
+            rd == resolved
+        })
+    });
+    let keep_resolved = std::fs::canonicalize(keep_dir).unwrap_or_else(|_| keep_dir.to_path_buf());
+    if !registered.iter().any(|p| {
+        std::fs::canonicalize(p).unwrap_or_else(|_| p.clone()) == keep_resolved
+    }) {
+        registered.push(keep_dir.to_path_buf());
+    }
+
+    let mut json = openvrpaths::load_openvr_paths_json()?;
+    let list_ref = json.get_mut("external_drivers").to_any()?;
+    *list_ref = openvrpaths::to_openvr_paths(&registered);
+    openvrpaths::save_openvr_paths_json(&json)
 }
 
 pub fn get_driver_dir_from_registered() -> Result<PathBuf> {

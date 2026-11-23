@@ -296,20 +296,40 @@ fn apply_auto_driver_selection() {
     // Physical topology / explicit choice decides, with no dependency on the
     // Huawei assistant: `usb` (or auto + glasses on PC) -> official driver,
     // `adb` (or auto + glasses off PC) -> ALVR.
-    let result = match mode {
-        ConnectionMode::Usb => alvr_server_io::select_driver(true).map(|_| Some("huaweiVR")),
-        ConnectionMode::Adb => alvr_server_io::select_driver(false).map(|_| Some("alvr_server")),
+    let use_huawei = match mode {
+        ConnectionMode::Usb => true,
+        ConnectionMode::Adb => false,
         ConnectionMode::Auto => {
             let keywords = glasses_edid_keywords();
-            let glasses_on_pc = alvr_server_io::is_glasses_attached_to_pc(&keywords);
-            alvr_server_io::apply_auto_driver_selection(glasses_on_pc)
+            alvr_server_io::is_glasses_attached_to_pc(&keywords)
         }
     };
+    let hmd = if use_huawei {
+        alvr_server_io::HmdDriver::Huawei
+    } else {
+        alvr_server_io::HmdDriver::Alvr
+    };
 
-    match result {
-        Ok(Some(winner)) => debug!("Driver selection: using {winner} (mode {mode:?})"),
-        Ok(None) => debug!("Driver selection: skipped, no Huawei driver registered"),
-        Err(err) => warn!("Driver selection failed: {err:?}"),
+    // 1) enable flag in steamvr.vrsettings
+    if let Err(err) = alvr_server_io::select_driver(use_huawei) {
+        warn!("Driver enable selection failed: {err:?}");
+    }
+
+    // 2) SteamVR load list (openvrpaths.vrpath): keep only the active HMD
+    //    driver registered. Third-party drivers are preserved.
+    let storage = std::env::current_exe()
+        .ok()
+        .map(|p| {
+            let mut d = p;
+            d.pop();
+            d
+        })
+        .unwrap_or_default();
+    let alvr_dir = crate::get_filesystem_layout().openvr_driver_root_dir;
+    let huawei_dir = storage.join("huawei-driver");
+    match alvr_server_io::apply_driver_registration_for_mode(hmd, &alvr_dir, &huawei_dir, &storage) {
+        Ok(()) => debug!("Driver load list: kept {:?} (mode {mode:?})", hmd),
+        Err(err) => warn!("Driver load-list selection failed: {err:?}"),
     }
 
     // The phone normally is NOT on USB (its port is taken by the glasses), so
