@@ -290,8 +290,8 @@ void DmSettingsDefault(DmSettings* s) {
     s->panX = 0.0f; s->panY = 0.0f;
     s->panoKind = 0;
     s->followRangeDeg = 20.0f;// 跟随触发范围
-    s->eyeRot[0] = 270.0f;
-    s->eyeRot[1] = 90.0f;          // 与左眼相差 180°（面板+镜片的物理特性）
+    s->eyeRot[0] = 0.0f;           // 两眼各 +90°（整体向上转 90°）
+    s->eyeRot[1] = 180.0f;         // 与左眼相差 180°（面板+镜片的物理特性，必须保持）
     s->eyeMirrorX[0] = s->eyeMirrorX[1] = 0;
     s->eyeMirrorY[0] = s->eyeMirrorY[1] = 0;
     s->eyeDx[0] = s->eyeDx[1] = 0.0f;

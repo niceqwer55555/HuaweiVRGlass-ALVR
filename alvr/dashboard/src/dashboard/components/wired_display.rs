@@ -56,8 +56,8 @@ const fn txt(section: &'static str, key: &'static str, label: &'static str, hint
 const FIELDS: &[IniField] = &[
     // 画面方向（画面上下/左右颠倒时调这里）
     txt("display", "flip180", "整幅翻转180° (0/1)", "画面上下颠倒时设为 1 或 0 试一下"),
-    num("display", "eye_rot_left", "左眼旋转 (°)", "每只眼贴屏旋转，通常左270/右90", 0.0, 360.0),
-    num("display", "eye_rot_right", "右眼旋转 (°)", "与左眼通常相差180°", 0.0, 360.0),
+    num("display", "eye_rot_left", "左眼旋转 (°)", "每只眼贴屏旋转；整体向上转90°后为左0/右180", 0.0, 360.0),
+    num("display", "eye_rot_right", "右眼旋转 (°)", "必须与左眼相差180°（面板+镜片物理特性）", 0.0, 360.0),
     num("display", "roll_left", "左眼预旋转 (°)", "画面左右颠倒时微调", -180.0, 180.0),
     num("display", "roll_right", "右眼预旋转 (°)", "画面左右颠倒时微调", -180.0, 180.0),
     txt("s3d", "swap_eyes", "左右眼交换 (0/1)", "左右眼画面反了就设为 1"),
@@ -437,7 +437,7 @@ impl WiredDisplayTab {
                 );
                 ui.add_space(4.0);
                 ui.label(
-                    RichText::new("画面方向不对（上下颠倒 / 左右反）？先调下面一组，每改一次点「保存参数」，运行中渲染器会自动重载。")
+                    RichText::new("画面方向不对（上下颠倒 / 左右反）？调下面一组即可——改动实时保存到 ini，运行中渲染器自动重载，无需点保存。")
                         .size(11.0)
                         .color(palette.accent_variant),
                 );
@@ -453,13 +453,21 @@ impl WiredDisplayTab {
                                 .changed();
                             if changed {
                                 self.values[i] = format!("{v:.2}");
+                                // Live-apply: write the ini immediately so the
+                                // renderer's 600ms hot-reload picks it up. No
+                                // need to click a separate "Save" button.
+                                self.save_config();
                             }
                         } else {
-                            ui.add(
+                            let changed = ui.add(
                                 egui::TextEdit::singleline(&mut self.values[i])
                                     .desired_width(60.0)
                                     .hint_text("默认"),
-                            );
+                            ).changed();
+                            if changed {
+                                // Live-apply text fields on edit-complete.
+                                self.save_config();
+                            }
                         }
                     });
                 }
