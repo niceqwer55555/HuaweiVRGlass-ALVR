@@ -88,12 +88,20 @@ Write-Host "template : $TemplateDir"
 Write-Host "output   : $outputDir"
 Write-Host "dashboard: $dashboardExe"
 
+# Start from a clean output tree: otherwise stale files from a previous build
+# (test dumps, logs, old manifests) silently ship in the archive.
+if ($outputDir.TrimEnd('\') -ieq $TemplateDir.TrimEnd('\')) {
+    throw "OutputDir must differ from TemplateDir: $outputDir"
+}
+# Note: we deliberately do NOT clean a pre-existing outputDir here. The local
+# safe-delete layer fails closed on Remove-Item, and an interrupted previous
+# run can leave a half-built tree. Use a fresh -OutputDir when that happens.
 New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 # Skip debug symbols, backups and logs - useless in a distributable package
 # and responsible for most of the size (a stale .pdb alone is ~50 MB).
 $excludedNames = @(
     '*.pdb', '*.bak', '*.bak_*', 'crash_log.txt', 'session_invalid.json',
-    '*.7z', '*.zip'
+    'session_old.json', '*.log', '*.bmp', '*.7z', '*.zip'
 )
 function Copy-TemplateTree {
     param([string]$Source, [string]$Destination)
