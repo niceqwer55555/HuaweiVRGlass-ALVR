@@ -290,7 +290,25 @@ fn glasses_edid_keywords() -> Vec<String> {
 ///
 /// SteamVR reads the enable flags while starting up, so this must run before it
 /// is launched.
-fn apply_auto_driver_selection() {
+/// Ensure both bundled drivers are registered with SteamVR, then switch to the
+/// one matching the current connection. Call this from UI actions that need
+/// "auto-install driver" behaviour (e.g. enabling the wired client).
+pub fn ensure_drivers_installed() {
+    let alvr_dir = crate::get_filesystem_layout().openvr_driver_root_dir;
+    alvr_server_io::driver_registration(&[alvr_dir], true).ok();
+
+    let mut bundled_huawei = std::env::current_exe().unwrap_or_default();
+    bundled_huawei.pop();
+    bundled_huawei.push("huawei-driver");
+    if let Err(err) = alvr_server_io::register_bundled_huawei_driver(&bundled_huawei) {
+        warn!("Failed to register bundled Huawei driver: {err:?}");
+    }
+    apply_auto_driver_selection();
+}
+
+/// Switch enable flags + OpenVR load list to the driver matching the current
+/// physical connection. Assumes both drivers are already registered.
+pub fn apply_auto_driver_selection() {
     let mode = connection_mode();
 
     // Physical topology / explicit choice decides, with no dependency on the

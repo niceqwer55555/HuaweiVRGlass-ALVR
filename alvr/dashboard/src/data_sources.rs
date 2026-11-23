@@ -169,7 +169,15 @@ impl DataSources {
                                     report_session_local(&context, &events_sender, session_manager);
                                 }
                                 ServerRequest::UpdateClientList { hostname, action } => {
+                                    let enabling_wired = hostname == alvr_sockets::WIRED_CLIENT_HOSTNAME
+                                        && matches!(action, alvr_packets::ClientListAction::AddIfMissing { .. });
                                     session_manager.update_client_list(hostname, action);
+
+                                    // Turning on "wired connection" must also make sure the
+                                    // matching OpenVR driver is installed and selected.
+                                    if enabling_wired {
+                                        crate::steamvr_launcher::ensure_drivers_installed();
+                                    }
 
                                     report_session_local(&context, &events_sender, session_manager);
                                 }
