@@ -123,6 +123,41 @@ if (Test-Path -LiteralPath (Join-Path $artifactDir 'huawei-driver') -PathType Co
     }
     Write-Host "  registered driver Path = $hdrRoot" -ForegroundColor Green
     if ($steamvrPath) { Write-Host "  SteamVR path = $steamvrPath" -ForegroundColor Green }
+
+    # Install BOTH drivers directly into SteamVR's built-in drivers/ folder.
+    # SteamVR auto-loads everything there WITHOUT relying on openvrpaths
+    # external_drivers (which SteamVR rewrites/clears on startup/exit). This is
+    # the robust way: no registration to lose. enable flags in steamvr.vrsettings
+    # still select which one actually runs (usb -> huaweiVR, adb -> alvr_server).
+    if ($steamvrPath) {
+        # Official Huawei driver (whole folder)
+        $builtinHw = Join-Path $steamvrPath 'drivers\huaweivr'
+        $builtinHwDll = Join-Path $builtinHw 'bin\win64\driver_huaweiVR.dll'
+        if (-not (Test-Path -LiteralPath $builtinHwDll -PathType Leaf)) {
+            try {
+                New-Item -ItemType Directory -Path (Join-Path $steamvrPath 'drivers') -Force | Out-Null
+                Copy-Item -LiteralPath (Join-Path $artifactDir 'huawei-driver') -Destination $builtinHw -Recurse -Force -ErrorAction Stop | Out-Null
+                Write-Host "  installed Huawei driver into SteamVR built-in: $builtinHw" -ForegroundColor Green
+            } catch { Write-Host "  could not install Huawei built-in driver: $_" -ForegroundColor Yellow }
+        } else { Write-Host "  built-in Huawei driver already present" -ForegroundColor Green }
+
+        # ALVR driver (manifest + 3 dlls) - same treatment, for wireless mode
+        $builtinAlvr = Join-Path $steamvrPath 'drivers\alvr_server'
+        $builtinAlvrDll = Join-Path $builtinAlvr 'bin\win64\driver_alvr_server.dll'
+        if ((Test-Path -LiteralPath (Join-Path $artifactDir 'driver.vrdrivermanifest') -PathType Leaf) -and
+            -not (Test-Path -LiteralPath $builtinAlvrDll -PathType Leaf)) {
+            try {
+                New-Item -ItemType Directory -Path (Join-Path $builtinAlvr 'bin\win64') -Force | Out-Null
+                Copy-Item -LiteralPath (Join-Path $artifactDir 'driver.vrdrivermanifest') -Destination $builtinAlvr -Force -ErrorAction Stop
+                foreach ($f in @('driver_alvr_server.dll', 'openvr_api.dll', 'vcruntime140_1.dll')) {
+                    Copy-Item -LiteralPath (Join-Path $artifactDir "bin\win64\$f") -Destination (Join-Path $builtinAlvr 'bin\win64') -Force -ErrorAction Stop
+                }
+                Write-Host "  installed ALVR driver into SteamVR built-in: $builtinAlvr" -ForegroundColor Green
+            } catch { Write-Host "  could not install ALVR built-in driver: $_" -ForegroundColor Yellow }
+        } elseif (Test-Path -LiteralPath $builtinAlvrDll -PathType Leaf) {
+            Write-Host "  built-in ALVR driver already present" -ForegroundColor Green
+        }
+    }
 } else {
     Write-Host "  huawei-driver not found under $artifactDir; skipped registry setup" -ForegroundColor Yellow
 }
