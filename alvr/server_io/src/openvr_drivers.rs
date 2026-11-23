@@ -281,20 +281,46 @@ pub fn apply_auto_driver_selection(glasses_on_pc: bool) -> Result<Option<&'stati
         return Ok(None);
     }
 
-    // Seeing the glasses as a monitor is not enough: the official driver can
-    // only initialise while the Huawei assistant owns the glasses' USB/DP link.
-    // Without it the driver reports pNumDisplay=0 / Init_HmdNotFound and
-    // SteamVR ends up with no HMD at all - while we have just disabled ALVR.
-    // Prefer ALVR unless the assistant is actually running.
-    let wired_ready = glasses_on_pc && is_huawei_assistant_running();
-    let winner = if wired_ready {
+    // Physical topology decides: glasses on the PC (visible as a monitor /
+    // USB device) -> official wired driver; glasses on the phone -> ALVR.
+    // No dependency on the Huawei assistant process: if the official driver
+    // needs it, the driver itself launches it via its named mutex. We only
+    // own the enable flags here.
+    let winner = if glasses_on_pc {
         HUAWEI_DRIVER_NAME
     } else {
         ALVR_DRIVER_NAME
     };
-    select_driver(wired_ready)?;
+    select_driver(glasses_on_pc)?;
 
     Ok(Some(winner))
+}
+
+/// Register the bundled official Huawei driver (if present) as THE huaweiVR
+/// driver, removing any other registered copy. SteamVR keys the enable flag on
+/// the driver NAME, so several copies of `huaweiVR` all switch together and one
+/// of them may be a stale/shim path. Keeping only our bundled copy makes the
+/// USB/ALVR auto-switch deterministic and removes the need for an external
+/// Huawei PC VR assistant install.
+pub fn register_bundled_huawei_driver(dir: &std::path::Path) -> Result<()> {
+    if !dir.join("driver.vrdrivermanifest").is_file()
+        || !dir.join("bin").join("win64").join("driver_huaweiVR.dll").is_file()
+    {
+        return Ok(()); // not bundled in this build; leave existing registration alone
+    }
+
+    let wanted = std::fs::canonicalize(dir).unwrap_or_else(|_| dir.to_path_buf());
+    let duplicates: Vec<PathBuf> = get_registered_drivers()?
+        .into_iter()
+        .filter(|p| {
+            let resolved = std::fs::canonicalize(p).unwrap_or_else(|_| p.clone());
+            resolved != wanted && driver_name_of(p).as_deref() == Some(HUAWEI_DRIVER_NAME)
+        })
+        .collect();
+    if !duplicates.is_empty() {
+        driver_registration(&duplicates, false)?;
+    }
+    driver_registration(&[wanted], true)
 }
 
 pub fn get_driver_dir_from_registered() -> Result<PathBuf> {

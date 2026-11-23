@@ -302,22 +302,12 @@ function Decide-Mode {
     }
     Write-Host "glasses on PC   : $(if ($glasses.Found) { "YES ($($glasses.Match))" } else { 'no (EDID not matched)' })"
 
-    # Seeing the glasses as a DP monitor is not sufficient: the official driver
-    # also needs the Huawei assistant to own the USB/DP link. Without it the
-    # driver fails with pNumDisplay=0 / Init_HmdNotFound, leaving no HMD at all.
-    # Mirror the Rust auto selection: only pick usb when the assistant is alive.
-    $assistant = @(Get-Process -ErrorAction SilentlyContinue |
-                   Where-Object { $_.ProcessName -match 'HwPCVRAssistant|PCCastScreen|HwVRGlassLite' })
-    $wiredReady = $glasses.Found -and $assistant.Count -gt 0
-    if ($glasses.Found -and -not $wiredReady) {
-        Write-Host "  NOTE: glasses on PC but Huawei assistant not running -> official wired cannot init." -ForegroundColor Yellow
-    }
-    # Even when the glasses are on the PC (DP visible) but the assistant is
-    # absent, ALVR is still the usable path: keep SteamVR alive with `adb`
-    # instead of reporting "nothing detected". This mirrors the Rust selector.
-    $detected = if ($wiredReady) {
+    # Physical topology decides - no Huawei-assistant dependency. The official
+    # driver launches the assistant itself via its named mutex if it needs it.
+    # Glasses visible as a monitor/USB device => docked to PC => official driver.
+    $detected = if ($glasses.Found) {
         'usb'
-    } elseif ($glasses.Found -or $phones.Phones.Count -gt 0) {
+    } elseif ($phones.Phones.Count -gt 0) {
         'adb'
     } else {
         $null
@@ -326,15 +316,6 @@ function Decide-Mode {
     if ($Explicit -and $Explicit -ne 'auto') {
         $chosen = $Explicit
         $reason = "forced by -Mode $Explicit"
-        # A forced `usb` still cannot work without the assistant: the official
-        # driver fails with HmdNotFound and SteamVR ends up with no HMD. Fall
-        # back to adb so SteamVR stays usable (dashboard does the same).
-        if ($chosen -eq 'usb' -and $assistant.Count -eq 0) {
-            Write-Host "  WARNING: -Mode usb but Huawei assistant is not running; official driver cannot init." -ForegroundColor Yellow
-            Write-Host "           Falling back to 'adb' so SteamVR has a usable HMD." -ForegroundColor Yellow
-            $chosen = 'adb'
-            $reason = 'usb requested but assistant absent -> adb fallback'
-        }
         if ($detected -and $detected -ne $chosen) {
             Write-Host "  NOTE: hardware suggests '$detected' but mode is '$chosen'." -ForegroundColor Yellow
         }

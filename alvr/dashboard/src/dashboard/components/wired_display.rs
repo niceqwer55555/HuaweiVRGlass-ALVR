@@ -35,23 +35,41 @@ const RENDERER_DIR: &str = "desktop-mode";
 const RENDERER_EXE: &str = "HwVRDesktop.exe";
 const RENDERER_CONFIG: &str = "desktop_mode.ini";
 
-/// A single ini key we expose in the UI. `section.key` maps to the file.
+/// A single ini key exposed in the UI. `section.key` maps to the file. Numeric
+/// fields get a slider over `range`; step/enum fields stay as a small editor.
 struct IniField {
     section: &'static str,
     key: &'static str,
     label: &'static str,
     hint: &'static str,
+    /// Some((min, max)) -> render as a slider; None -> plain text editor.
+    range: Option<(f32, f32)>,
+}
+
+const fn num(section: &'static str, key: &'static str, label: &'static str, hint: &'static str, min: f32, max: f32) -> IniField {
+    IniField { section, key, label, hint, range: Some((min, max)) }
+}
+const fn txt(section: &'static str, key: &'static str, label: &'static str, hint: &'static str) -> IniField {
+    IniField { section, key, label, hint, range: None }
 }
 
 const FIELDS: &[IniField] = &[
-    IniField { section: "display", key: "distance", label: "距离 (m)", hint: "画面离眼睛多远，0.5~10" },
-    IniField { section: "display", key: "scale", label: "缩放", hint: "画面大小" },
-    IniField { section: "display", key: "curvature", label: "弯曲度", hint: "0=平面，1=贴脸圆柱" },
-    IniField { section: "display", key: "opacity", label: "不透明度", hint: "0~1" },
-    IniField { section: "display", key: "ipd", label: "瞳距 (mm)", hint: "左右眼间距" },
-    IniField { section: "display", key: "fov_tan_x", label: "水平视角", hint: "tan 值，1.0=90°，越小画面越大" },
-    IniField { section: "mode", key: "follow", label: "跟随头部 (1/0)", hint: "1=平滑跟随，0=悬停世界锁定" },
-    IniField { section: "s3d", key: "mode", label: "3D 模式", hint: "0=2D，1=SBS半宽，2=SBS全宽，3=上下" },
+    // 画面方向（画面上下/左右颠倒时调这里）
+    txt("display", "flip180", "整幅翻转180° (0/1)", "画面上下颠倒时设为 1 或 0 试一下"),
+    num("display", "eye_rot_left", "左眼旋转 (°)", "每只眼贴屏旋转，通常左270/右90", 0.0, 360.0),
+    num("display", "eye_rot_right", "右眼旋转 (°)", "与左眼通常相差180°", 0.0, 360.0),
+    num("display", "roll_left", "左眼预旋转 (°)", "画面左右颠倒时微调", -180.0, 180.0),
+    num("display", "roll_right", "右眼预旋转 (°)", "画面左右颠倒时微调", -180.0, 180.0),
+    txt("s3d", "swap_eyes", "左右眼交换 (0/1)", "左右眼画面反了就设为 1"),
+    // 常规画面参数
+    num("display", "distance", "距离 (m)", "画面离眼睛多远，0.5~10", 0.5, 10.0),
+    num("display", "scale", "缩放", "画面大小", 0.5, 10.0),
+    num("display", "curvature", "弯曲度", "0=平面，1=贴脸圆柱", 0.0, 1.0),
+    num("display", "opacity", "不透明度", "0~1", 0.1, 1.0),
+    num("display", "ipd", "瞳距 (mm)", "左右眼间距", 30.0, 80.0),
+    num("display", "fov_tan_x", "水平视角", "tan 值，1.0=90°，越小画面越大", 0.5, 2.0),
+    txt("mode", "follow", "跟随头部 (1/0)", "1=平滑跟随，0=悬停世界锁定"),
+    txt("s3d", "mode", "3D 模式", "0=2D，1=SBS半宽，2=SBS全宽，3=上下"),
 ];
 
 pub struct WiredDisplayTab {
@@ -418,14 +436,31 @@ impl WiredDisplayTab {
                     .color(palette.muted_foreground),
                 );
                 ui.add_space(4.0);
+                ui.label(
+                    RichText::new("画面方向不对（上下颠倒 / 左右反）？先调下面一组，每改一次点「保存参数」，运行中渲染器会自动重载。")
+                        .size(11.0)
+                        .color(palette.accent_variant),
+                );
                 for (i, field) in FIELDS.iter().enumerate() {
                     ui.horizontal(|ui| {
                         ui.label(field.label).on_hover_text(field.hint);
-                        ui.add(
-                            egui::TextEdit::singleline(&mut self.values[i])
-                                .desired_width(80.0)
-                                .hint_text("默认"),
-                        );
+                        if let Some((min, max)) = field.range {
+                            // Numeric field: slider + live value. Parse the
+                            // stored string, fall back to the range midpoint.
+                            let mut v = self.values[i].parse::<f32>().unwrap_or((min + max) / 2.0);
+                            let changed = ui
+                                .add(egui::Slider::new(&mut v, min..=max))
+                                .changed();
+                            if changed {
+                                self.values[i] = format!("{v:.2}");
+                            }
+                        } else {
+                            ui.add(
+                                egui::TextEdit::singleline(&mut self.values[i])
+                                    .desired_width(60.0)
+                                    .hint_text("默认"),
+                            );
+                        }
                     });
                 }
                 if ui.button("保存参数").clicked() {

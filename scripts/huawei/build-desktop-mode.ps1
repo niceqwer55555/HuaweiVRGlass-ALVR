@@ -82,6 +82,12 @@ tilt=0.0
 ipd=40
 fov_tan_x=1.0
 fov_tan_y=1.0
+# 画面方向（反了就调这几个，渲染器每 0.6s 自动重载）
+flip180=1
+eye_rot_left=270
+eye_rot_right=90
+roll_left=0
+roll_right=0
 
 [mode]
 follow=1

@@ -293,24 +293,11 @@ fn glasses_edid_keywords() -> Vec<String> {
 fn apply_auto_driver_selection() {
     let mode = connection_mode();
 
-    // `adb` is explicit: ALVR must win even though the glasses are a DP monitor.
-    // `usb` is a REQUEST for official wired mode, but that driver physically
-    // cannot init without the Huawei assistant owning the glasses' USB/DP link
-    // (pNumDisplay=0 / Init_HmdNotFound). Honour the request only when the
-    // assistant is actually running; otherwise keep ALVR so SteamVR still has
-    // a usable HMD. `auto` delegates to the same readiness-aware selector.
+    // Physical topology / explicit choice decides, with no dependency on the
+    // Huawei assistant: `usb` (or auto + glasses on PC) -> official driver,
+    // `adb` (or auto + glasses off PC) -> ALVR.
     let result = match mode {
-        ConnectionMode::Usb => {
-            if alvr_server_io::is_huawei_assistant_running() {
-                alvr_server_io::select_driver(true).map(|_| Some("huaweiVR"))
-            } else {
-                warn!(
-                    "vr_mode=usb requested but Huawei assistant is not running; \
-                     the official driver would fail with HmdNotFound. Keeping ALVR."
-                );
-                alvr_server_io::select_driver(false).map(|_| Some("alvr_server"))
-            }
-        }
+        ConnectionMode::Usb => alvr_server_io::select_driver(true).map(|_| Some("huaweiVR")),
         ConnectionMode::Adb => alvr_server_io::select_driver(false).map(|_| Some("alvr_server")),
         ConnectionMode::Auto => {
             let keywords = glasses_edid_keywords();
@@ -402,6 +389,16 @@ impl Launcher {
         alvr_server_io::driver_registration(&other_alvr_dirs, false).ok();
 
         alvr_server_io::driver_registration(&[alvr_driver_dir], true).ok();
+
+        // Register our bundled official driver so USB mode never depends on an
+        // external Huawei PC VR assistant install. This also removes duplicate
+        // huaweiVR copies that would otherwise share the enable flag.
+        let mut bundled_huawei = std::env::current_exe().unwrap_or_default();
+        bundled_huawei.pop();
+        bundled_huawei.push("huawei-driver");
+        if let Err(err) = alvr_server_io::register_bundled_huawei_driver(&bundled_huawei) {
+            warn!("Failed to register bundled Huawei driver: {err:?}");
+        }
 
         if let Err(err) = unblock_alvr_driver() {
             warn!("Failed to unblock ALVR driver: {:?}", err);
