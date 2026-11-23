@@ -208,3 +208,56 @@ foreach ($p in @($newList)) { Say "  $p" }
 Say ("enable: alvr_server={0}  huaweiVR={1}" -f $(if ($wantHuawei) {'false'} else {'true'}), $(if ($wantHuawei) {'true'} else {'false'}))
 Say "backup of vrsettings: $bak" 'DarkGray'
 Say "Restart SteamVR for the load-list change to take effect." 'Yellow'
+
+# ---------------------------------------------------------------- assistant beacon
+# The official Huawei driver launches HwPCVRAssistant.exe unless a mutex named
+# "HwPCVRAssistant.exe" already exists. AssistantBeacon.exe holds just that
+# mutex, so in USB mode the driver sees the assistant as "running" and never
+# spawns the real one. We do NOT depend on the assistant at all.
+if (-not $Status) {
+    $beaconExe = Join-Path $art 'AssistantBeacon.exe'
+    if ($wantHuawei) {
+        # Force the driver's resource Path to OUR artifacts. The Huawei
+        # assistant, if it ever runs, rewrites this key back to its own dir
+        # (e.g. F:\PY\HwPCVR Assistant) and the driver then spawns it again on
+        # every SteamVR start. Pointing at our hw-assistant (which has NO
+        # HwPCVRAssistant.exe) means the driver loads VR6DOF.dll from us and
+        # has no assistant exe to launch -> fully independent of the assistant.
+        $hwAssistantRoot = Join-Path $art 'hw-assistant'
+        $regKey = 'HKCU:\SOFTWARE\HuaweiPCVRAssistant'
+        if (Test-Path -LiteralPath (Join-Path $hwAssistantRoot 'steamVRDriver\huaweiVR\bin\win64\VR6DOF.dll')) {
+            try {
+                if (-not (Test-Path $regKey)) { New-Item -Path $regKey -Force | Out-Null }
+                $curPath = (Get-ItemProperty -Path $regKey -Name 'Path' -ErrorAction SilentlyContinue).Path
+                if ($curPath -ne $hwAssistantRoot) {
+                    Set-ItemProperty -Path $regKey -Name 'Path' -Value $hwAssistantRoot -Type String
+                    Say "driver Path -> artifacts (was: $curPath)" 'Green'
+                }
+            } catch { Say "could not set driver Path: $_" 'Yellow' }
+        }
+        # Kill any real assistant that a previous run may have spawned.
+        $real = @(Get-Process -ErrorAction SilentlyContinue | Where-Object {
+            $_.ProcessName -match '^(HwPCVRAssistant|PCCastScreen)$' })
+        foreach ($p in $real) {
+            try { Stop-Process -Id $p.Id -Force -ErrorAction Stop; Say "stopped real assistant pid $($p.Id)" 'Yellow' } catch {}
+        }
+        if (Test-Path -LiteralPath $beaconExe -PathType Leaf) {
+            $beacon = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -eq 'AssistantBeacon' })
+            if ($beacon.Count -eq 0) {
+                try {
+                    Start-Process -FilePath $beaconExe -WindowStyle Hidden -ErrorAction Stop | Out-Null
+                    Say "assistant beacon started (mutex held, real assistant suppressed)" 'Green'
+                } catch { Say "could not start assistant beacon: $_" 'Yellow' }
+            } else {
+                Say "assistant beacon already running (pid $($beacon[0].Id))" 'Green'
+            }
+        } else {
+            Say "AssistantBeacon.exe not found - driver may launch the real assistant" 'Yellow'
+        }
+    } else {
+        $beacon = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -eq 'AssistantBeacon' })
+        foreach ($p in $beacon) {
+            try { Stop-Process -Id $p.Id -Force -ErrorAction Stop; Say "stopped assistant beacon pid $($p.Id)" 'DarkGray' } catch {}
+        }
+    }
+}
