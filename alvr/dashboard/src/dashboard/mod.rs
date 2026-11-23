@@ -174,6 +174,14 @@ pub struct Dashboard {
 
 impl Dashboard {
     pub fn new(creation_context: &eframe::CreationContext<'_>, data_sources: DataSources) -> Self {
+        // Auto-install / auto-switch the OpenVR drivers as soon as the
+        // dashboard starts. This makes "just open the dashboard" install the
+        // driver matching the current USB/wireless connection. The server_io
+        // helpers ignore temp package paths, so launching from a build dir is
+        // harmless. Cheap and idempotent.
+        #[cfg(not(target_arch = "wasm32"))]
+        crate::steamvr_launcher::ensure_drivers_installed();
+
         let dashboard_theme = creation_context
             .storage
             .and_then(|storage| storage.get_string(THEME_STORAGE_KEY))

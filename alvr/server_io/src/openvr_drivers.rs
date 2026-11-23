@@ -306,6 +306,11 @@ pub fn apply_auto_driver_selection(glasses_on_pc: bool) -> Result<Option<&'stati
 /// USB/ALVR auto-switch deterministic and removes the need for an external
 /// Huawei PC VR assistant install.
 pub fn register_bundled_huawei_driver(dir: &std::path::Path) -> Result<()> {
+    if is_temp_build_path(dir) {
+        // Launched from a temp package dir: never persist that path. The stable
+        // artifacts registration is handled by apply_driver_registration_for_mode.
+        return Ok(());
+    }
     if !dir.join("driver.vrdrivermanifest").is_file()
         || !dir.join("bin").join("win64").join("driver_huaweiVR.dll").is_file()
     {
@@ -331,6 +336,16 @@ pub fn register_bundled_huawei_driver(dir: &std::path::Path) -> Result<()> {
 pub enum HmdDriver {
     Alvr,
     Huawei,
+}
+
+/// True for paths inside a packaging output directory (`build/end/server*`).
+/// The dashboard may be launched from a freshly built package for testing; the
+/// driver paths derived from such an exe are temporary and must never be
+/// persisted into the OpenVR load list - doing so breaks the registration as
+/// soon as the package folder is replaced or deleted.
+fn is_temp_build_path(path: &std::path::Path) -> bool {
+    let text = path.to_string_lossy().replace('/', "\\").to_lowercase();
+    text.contains("\\build\\end\\")
 }
 
 /// Make SteamVR's load list (openvrpaths.vrpath `external_drivers`) contain only
@@ -364,7 +379,10 @@ pub fn apply_driver_registration_for_mode(
                 if let Some(arr) = v.get(key).and_then(|x| x.as_array()) {
                     for item in arr {
                         if let Some(s) = item.as_str() {
-                            out.push(PathBuf::from(s));
+                            let p = PathBuf::from(s);
+                            if !is_temp_build_path(&p) {
+                                out.push(p);
+                            }
                         }
                     }
                 }
@@ -373,6 +391,7 @@ pub fn apply_driver_registration_for_mode(
     }
     let mut registered = get_registered_drivers()?;
     for p in &registered {
+        if is_temp_build_path(p) { continue; }
         match driver_name_of(p).as_deref() {
             Some(ALVR_DRIVER_NAME) if !known_alvr.contains(p) => known_alvr.push(p.clone()),
             Some(HUAWEI_DRIVER_NAME) if !known_huawei.contains(p) => known_huawei.push(p.clone()),
@@ -380,6 +399,7 @@ pub fn apply_driver_registration_for_mode(
         }
     }
     for p in [alvr_dir, huawei_dir] {
+        if is_temp_build_path(p) { continue; }
         let list = if p == alvr_dir { &mut known_alvr } else { &mut known_huawei };
         if !list.contains(&p.to_path_buf()) { list.push(p.to_path_buf()); }
     }
@@ -398,17 +418,22 @@ pub fn apply_driver_registration_for_mode(
         HmdDriver::Huawei => &known_alvr,
     };
     registered.retain(|p| {
+        if is_temp_build_path(p) { return false; }   // never persist temp package paths
         let resolved = std::fs::canonicalize(p).unwrap_or_else(|_| p.clone());
         !drop_paths.iter().any(|d| {
             let rd = std::fs::canonicalize(d).unwrap_or_else(|_| d.clone());
             rd == resolved
         })
     });
-    let keep_resolved = std::fs::canonicalize(keep_dir).unwrap_or_else(|_| keep_dir.to_path_buf());
-    if !registered.iter().any(|p| {
-        std::fs::canonicalize(p).unwrap_or_else(|_| p.clone()) == keep_resolved
-    }) {
-        registered.push(keep_dir.to_path_buf());
+    // If the active path itself is a temp package path, do not register it. The
+    // stable artifacts registration (if any) is already in `registered`.
+    if !is_temp_build_path(keep_dir) {
+        let keep_resolved = std::fs::canonicalize(keep_dir).unwrap_or_else(|_| keep_dir.to_path_buf());
+        if !registered.iter().any(|p| {
+            std::fs::canonicalize(p).unwrap_or_else(|_| p.clone()) == keep_resolved
+        }) {
+            registered.push(keep_dir.to_path_buf());
+        }
     }
 
     let mut json = openvrpaths::load_openvr_paths_json()?;
