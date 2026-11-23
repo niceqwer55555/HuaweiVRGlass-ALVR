@@ -170,6 +170,13 @@ pub struct Dashboard {
     new_version_popup: Option<components::NewVersionPopup>,
     setup_wizard_open: bool,
     session: Option<SessionConfig>,
+    /// Periodic auto-switch: remember last glasses-on-PC state so the dashboard
+    /// can re-run driver install/switch when the USB/wireless link changes,
+    /// even without the external watcher process running.
+    #[cfg(not(target_arch = "wasm32"))]
+    last_glasses_on_pc: Option<bool>,
+    #[cfg(not(target_arch = "wasm32"))]
+    last_driver_check: Option<std::time::Instant>,
 }
 
 impl Dashboard {
@@ -256,6 +263,10 @@ impl Dashboard {
             setup_wizard_open: false,
             session: None,
             new_version_popup: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            last_glasses_on_pc: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            last_driver_check: None,
         }
     }
 
@@ -307,6 +318,20 @@ impl Dashboard {
 impl eframe::App for Dashboard {
     fn update(&mut self, context: &egui::Context, _: &mut eframe::Frame) {
         let mut requests = vec![];
+
+        // Periodic USB/wireless auto-switch (independent of the external
+        // watcher process). Check at most once every 3 seconds.
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let due = self
+                .last_driver_check
+                .map(|t| t.elapsed() >= std::time::Duration::from_secs(3))
+                .unwrap_or(true);
+            if due {
+                crate::steamvr_launcher::auto_switch_if_needed(&mut self.last_glasses_on_pc);
+                self.last_driver_check = Some(std::time::Instant::now());
+            }
+        }
 
         let resolved_dark_mode = self.theme.resolved_is_dark(context);
         if resolved_dark_mode != self.applied_dark_mode {

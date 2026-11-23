@@ -306,6 +306,23 @@ pub fn ensure_drivers_installed() {
     apply_auto_driver_selection();
 }
 
+/// Periodically called from the dashboard UI loop. Detects a change in the
+/// physical connection (glasses docked to PC vs wireless) and re-runs the
+/// driver install/switch only when needed. Keeps auto-switch working even when
+/// the external watcher process is not running.
+pub fn auto_switch_if_needed(last_on_pc: &mut Option<bool>) -> bool {
+    let keywords = glasses_edid_keywords();
+    let on_pc = alvr_server_io::is_glasses_attached_to_pc(&keywords);
+    if last_on_pc.map(|v| v != on_pc).unwrap_or(false) {
+        ensure_drivers_installed();
+        *last_on_pc = Some(on_pc);
+        true
+    } else {
+        if last_on_pc.is_none() { *last_on_pc = Some(on_pc); }
+        false
+    }
+}
+
 /// Switch enable flags + OpenVR load list to the driver matching the current
 /// physical connection. Assumes both drivers are already registered.
 pub fn apply_auto_driver_selection() {
