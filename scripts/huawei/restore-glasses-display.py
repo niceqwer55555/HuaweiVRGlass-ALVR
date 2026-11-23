@@ -33,7 +33,10 @@ class DISPLAY_DEVICEW(ctypes.Structure):
     ]
 
 class DEVMODEW(ctypes.Structure):
-    # 220 bytes on Windows 10 x64 (see display.rs in this repo)
+    # 220 bytes on Windows x64. Layout mirrors display.rs DevmodeW exactly.
+    # The printer/display union after dmFields is 16 bytes total: POINTL(8) +
+    # display_orientation(4) + display_fixed_output(4). Do NOT also add the
+    # 8 printer shorts - that double-counts the union and shifts all offsets.
     _fields_ = [
         ("dmDeviceName", wintypes.WCHAR * 32),
         ("dmSpecVersion", wintypes.WORD),
@@ -41,14 +44,6 @@ class DEVMODEW(ctypes.Structure):
         ("dmSize", wintypes.WORD),
         ("dmDriverExtra", wintypes.WORD),
         ("dmFields", wintypes.DWORD),
-        ("dmOrientation", ctypes.c_short),
-        ("dmPaperSize", ctypes.c_short),
-        ("dmPaperLength", ctypes.c_short),
-        ("dmPaperWidth", ctypes.c_short),
-        ("dmScale", ctypes.c_short),
-        ("dmCopies", ctypes.c_short),
-        ("dmDefaultSource", ctypes.c_short),
-        ("dmPrintQuality", ctypes.c_short),
         ("dmPositionX", wintypes.LONG),
         ("dmPositionY", wintypes.LONG),
         ("dmDisplayOrientation", wintypes.DWORD),
