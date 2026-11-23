@@ -2,6 +2,7 @@ use crate::dashboard::ServerRequest;
 use alvr_common::ConnectionState;
 use alvr_gui_common::theme::{self, log_colors};
 use alvr_packets::ClientListAction;
+use alvr_server_io::list_displays;
 use alvr_session::{ClientConnectionConfig, SessionConfig};
 use alvr_sockets::WIRED_CLIENT_HOSTNAME;
 use eframe::{
@@ -9,6 +10,67 @@ use eframe::{
     emath::{Align, Align2},
     epaint::Color32,
 };
+use std::path::PathBuf;
+use std::process::{Command, Stdio};
+
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+const DESKTOP_RENDERER_EXE: &str = "HwVRDesktop.exe";
+
+/// Locate the bundled desktop-mode renderer next to this exe.
+fn desktop_renderer_path() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let dir = exe.parent()?;
+    let candidate = dir.join("desktop-mode").join(DESKTOP_RENDERER_EXE);
+    if candidate.is_file() { Some(candidate) } else { None }
+}
+
+/// Throttled-free, one-off process probe (called on button clicks / redraws).
+fn desktop_renderer_running() -> bool {
+    let mut command = Command::new("tasklist");
+    command.args(["/FI", &format!("IMAGENAME eq {DESKTOP_RENDERER_EXE}"), "/NH"]);
+    #[cfg(windows)]
+    command.creation_flags(CREATE_NO_WINDOW);
+    let Ok(out) = command.output() else { return false; };
+    String::from_utf8_lossy(&out.stdout)
+        .to_ascii_lowercase()
+        .contains(&DESKTOP_RENDERER_EXE.to_ascii_lowercase())
+}
+
+/// Start / stop the desktop renderer. Returns a short status message.
+fn desktop_renderer_action(start: bool) -> String {
+    if start {
+        let Some(exe) = desktop_renderer_path() else {
+            return "找不到 desktop-mode 渲染器".into();
+        };
+        if desktop_renderer_running() { return "桌面投屏已在运行".into(); }
+        // SteamVR and desktop mode fight over the glasses monitor.
+        let _ = Command::new("taskkill")
+            .args(["/IM", "vrserver.exe", "/F"])
+            .output();
+        let mut command = Command::new(&exe);
+        command.current_dir(exe.parent().unwrap_or(std::path::Path::new(".")))
+            .stdin(Stdio::null());
+        #[cfg(windows)]
+        command.creation_flags(CREATE_NO_WINDOW);
+        match command.spawn() {
+            Ok(_) => "桌面投屏已启动".into(),
+            Err(err) => format!("启动失败：{err}"),
+        }
+    } else {
+        let mut command = Command::new("taskkill");
+        command.args(["/IM", DESKTOP_RENDERER_EXE, "/F"]);
+        #[cfg(windows)]
+        command.creation_flags(CREATE_NO_WINDOW);
+        match command.output() {
+            Ok(_) => "桌面投屏已停止".into(),
+            Err(err) => format!("停止失败：{err}"),
+        }
+    }
+}
 
 struct EditPopupState {
     new_devices: bool,
@@ -88,11 +150,7 @@ impl DevicesTab {
                 let wired_client = clients
                     .iter()
                     .find(|(hostname, _)| hostname == WIRED_CLIENT_HOSTNAME);
-                if let Some(request) =
-                    wired_client_section(ui, wired_client, self.adb_download_progress)
-                {
-                    requests.push(request);
-                }
+                let _ = wired_client_section(ui, wired_client, self.adb_download_progress);
             }
 
             ui.add_space(10.0);
@@ -186,10 +244,18 @@ impl DevicesTab {
 
 fn wired_client_section(
     ui: &mut Ui,
-    maybe_client: Option<&(String, ClientConnectionConfig)>,
-    adb_download_progress: Option<f32>,
-) -> Option<ServerRequest> {
-    let mut request = None;
+    _maybe_client: Option<&(String, ClientConnectionConfig)>,
+    _adb_download_progress: Option<f32>,
+) {
+    // USB mode on this build uses the bundled HwVRDesktop renderer (plain D3D
+    // cast to the glasses DP monitor), NOT the ALVR wired streaming client.
+    // Show the renderer's real state instead of an always-"Disconnected"
+    // ALVR client that can never connect in this mode.
+    let running = desktop_renderer_running();
+    let glasses_res = list_displays()
+        .into_iter().find(|d| d.is_glasses())
+        .map(|d| format!("{}x{}", d.width, d.height))
+        .unwrap_or_else(|| "未检测到眼镜".into());
 
     theme::card_frame(ui.ctx())
         .fill(theme::palette(ui.ctx()).surface)
@@ -199,56 +265,36 @@ fn wired_client_section(
                 .num_columns(2)
                 .spacing(egui::vec2(8.0, 8.0))
                 .show(ui, |ui| {
-                    ui.heading("有线连接");
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        let mut wired = maybe_client.is_some();
-                        if alvr_gui_common::switch(ui, &mut wired).changed() {
-                            if wired {
-                                request = Some(ServerRequest::UpdateClientList {
-                                    hostname: WIRED_CLIENT_HOSTNAME.to_owned(),
-                                    action: ClientListAction::AddIfMissing {
-                                        trusted: true,
-                                        manual_ips: Vec::new(),
-                                    },
-                                });
-                            } else {
-                                request = Some(ServerRequest::UpdateClientList {
-                                    hostname: WIRED_CLIENT_HOSTNAME.to_owned(),
-                                    action: ClientListAction::RemoveEntry,
-                                });
+                    ui.heading("有线连接（USB 直连桌面投屏）");
+                    ui.end_row();
+
+                    ui.label("眼镜屏");
+                    ui.label(&glasses_res);
+                    ui.end_row();
+
+                    ui.label("桌面投屏渲染器");
+                    if running {
+                        ui.colored_label(theme::palette(ui.ctx()).ok, "运行中");
+                    } else {
+                        ui.colored_label(Color32::GRAY, "未运行");
+                    }
+                    ui.end_row();
+
+                    ui.label("");
+                    ui.horizontal(|ui| {
+                        if running {
+                            if ui.button("停止投屏").clicked() {
+                                let msg = desktop_renderer_action(false);
+                                alvr_common::info!("{msg}");
                             }
+                        } else if ui.button("启动投屏").clicked() {
+                            let msg = desktop_renderer_action(true);
+                            alvr_common::info!("{msg}");
                         }
                     });
                     ui.end_row();
-
-                    if let Some(progress) = adb_download_progress.filter(|p| *p < 1.0) {
-                        ui.horizontal(|ui| {
-                            ui.label("ADB 下载进度");
-                        });
-                        ui.horizontal(|ui| {
-                            ui.add(ProgressBar::new(progress).animate(true).show_percentage());
-                        });
-                        ui.end_row();
-                    } else if let Some((_, data)) = maybe_client {
-                        ui.horizontal(|ui| {
-                            let display_name = if data.display_name.is_empty()
-                                || data.display_name == "Unknown"
-                            {
-                                "HUAWEI VR Glass (USB)".to_owned()
-                            } else {
-                                data.display_name.clone()
-                            };
-                            ui.label(display_name);
-                        });
-                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            connection_label(ui, &data.connection_state);
-                        });
-                        ui.end_row();
-                    }
                 });
         });
-
-    request
 }
 
 fn new_clients_section(
