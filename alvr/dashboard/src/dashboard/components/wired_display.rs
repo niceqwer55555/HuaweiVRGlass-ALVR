@@ -56,8 +56,8 @@ const fn txt(section: &'static str, key: &'static str, label: &'static str, hint
 const FIELDS: &[IniField] = &[
     // 画面方向（画面上下/左右颠倒时调这里）
     txt("display", "flip180", "整幅翻转180° (0/1)", "整幅翻转；默认关(0)，每眼朝向请用下面「左右眼旋转」"),
-    num("display", "eye_rot_left", "左眼贴屏角 (°)", "贴屏角基准 左0/右180（必须差180°）；一般不用动", 0.0, 360.0),
-    num("display", "eye_rot_right", "右眼贴屏角 (°)", "与左眼相差180°（面板+镜片物理特性）", 0.0, 360.0),
+    num("display", "eye_rot_left", "左眼贴屏角 (°)", "本机面板两眼同向，贴屏角两眼都填0；一般不用动", 0.0, 360.0),
+    num("display", "eye_rot_right", "右眼贴屏角 (°)", "本机实测：填180°会让右眼画面倒置，应与左眼同为0", 0.0, 360.0),
     num("display", "roll_left", "左眼旋转 (°)", "每眼独立旋转画面；向下转90°填 -90（当前转正值）", -180.0, 180.0),
     num("display", "roll_right", "右眼旋转 (°)", "每眼独立旋转画面；与左眼同值 -90", -180.0, 180.0),
     txt("s3d", "swap_eyes", "左右眼交换 (0/1)", "左右眼画面反了就设为 1"),
