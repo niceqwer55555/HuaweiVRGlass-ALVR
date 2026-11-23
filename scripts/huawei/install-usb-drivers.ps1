@@ -19,14 +19,14 @@ param([switch]$Status)
 $ErrorActionPreference = 'Continue'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
-# Resolve driver root: script dir, or its parent if scripts/huawei layout.
+# The server directory is the script's own directory - no hardcoded drive/path.
+$serverDir = (Resolve-Path -LiteralPath $scriptDir).Path
 $candidates = @(
-    (Join-Path $scriptDir 'hw-usb-driver'),
-    (Join-Path $scriptDir '..\..\hw-usb-driver'),
-    'D:\PY\1\artifacts\HuaweiVRGlass-ALVR-Windows-v20.14.1\hw-usb-driver'
+    (Join-Path $serverDir 'hw-usb-driver'),
+    (Join-Path $serverDir '..\..\hw-usb-driver')
 )
 $driverRoot = $candidates | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Container) } | Select-Object -First 1
-if (-not $driverRoot) { throw "hw-usb-driver folder not found near $scriptDir" }
+if (-not $driverRoot) { throw "hw-usb-driver folder not found next to this script ($serverDir)" }
 $driverRoot = (Resolve-Path -LiteralPath $driverRoot).Path
 
 $cdcDir = Join-Path $driverRoot 'IMU\Driver\X64'
@@ -81,11 +81,7 @@ foreach ($inf in $infs) {
 # of the driver at <artifacts>\huawei-driver; stage it into that layout here.
 Write-Host ""
 Write-Host "=== configure official driver data path ===" -ForegroundColor Cyan
-$artifactDir = Split-Path -Parent $driverRoot
-if (-not (Test-Path -LiteralPath (Join-Path $artifactDir 'huawei-driver\driver.vrdrivermanifest') -PathType Leaf)) {
-    # script may live in scripts/huawei of the repo; find artifacts by manifest
-    $artifactDir = 'D:\PY\1\artifacts\HuaweiVRGlass-ALVR-Windows-v20.14.1'
-}
+$artifactDir = $serverDir   # everything lives in the server folder
 $hdrRoot = Join-Path $artifactDir 'hw-assistant'
 $hdrExpected = Join-Path $hdrRoot 'steamVRDriver\huaweiVR'
 if (Test-Path -LiteralPath (Join-Path $artifactDir 'huawei-driver') -PathType Container) {
@@ -93,20 +89,40 @@ if (Test-Path -LiteralPath (Join-Path $artifactDir 'huawei-driver') -PathType Co
         New-Item -ItemType Directory -Path (Split-Path -Parent $hdrExpected) -Force | Out-Null
         Copy-Item -LiteralPath (Join-Path $artifactDir 'huawei-driver') -Destination $hdrExpected -Recurse -Force -ErrorAction SilentlyContinue | Out-Null
     }
+    # Resolve SteamVR root from openvrpaths (no fixed drive/path), with
+    # conventional install locations as fallback for a fresh machine.
+    $steamvrPath = $null
+    $vrpathFile = Join-Path $env:LOCALAPPDATA 'openvr\openvrpaths.vrpath'
+    if (Test-Path -LiteralPath $vrpathFile -PathType Leaf) {
+        try {
+            $vp = Get-Content -LiteralPath $vrpathFile -Raw | ConvertFrom-Json
+            foreach ($r in @($vp.runtime)) {
+                if ($r -and (Test-Path -LiteralPath (Join-Path $r 'bin\win64\vrmonitor.exe') -PathType Leaf)) { $steamvrPath = $r; break }
+            }
+        } catch {}
+    }
+    if (-not $steamvrPath) {
+        foreach ($base in @($env:ProgramFiles, ${env:ProgramFiles(x86)}, "$env:LOCALAPPDATA\Programs")) {
+            if (-not $base) { continue }
+            $candidate = Join-Path $base 'Steam\steamapps\common\SteamVR'
+            if (Test-Path -LiteralPath (Join-Path $candidate 'bin\win64\vrmonitor.exe') -PathType Leaf) { $steamvrPath = $candidate; break }
+        }
+    }
     $regKey = 'HKCU:\SOFTWARE\HuaweiPCVRAssistant'
     if (-not (Test-Path $regKey)) { New-Item -Path $regKey -Force | Out-Null }
-    $steamvrPath = 'D:\Program Files\Steam\steamapps\common\SteamVR'
-    foreach ($pair in @(
+    $pairs = @(
         @('Path', $hdrRoot),
-        @('SteamVRInstalledPath', $steamvrPath),
         @('SteamVrFirstRunningStatus', 'TRUE'),
         @('XmlStatus', 'true'),
         @('GetXmlData', 'true'),
         @('DirectMode', 'true')
-    )) {
+    )
+    if ($steamvrPath) { $pairs += ,@('SteamVRInstalledPath', $steamvrPath) }
+    foreach ($pair in $pairs) {
         New-ItemProperty -Path $regKey -Name $pair[0] -Value $pair[1] -PropertyType String -Force | Out-Null
     }
     Write-Host "  registered driver Path = $hdrRoot" -ForegroundColor Green
+    if ($steamvrPath) { Write-Host "  SteamVR path = $steamvrPath" -ForegroundColor Green }
 } else {
     Write-Host "  huawei-driver not found under $artifactDir; skipped registry setup" -ForegroundColor Yellow
 }

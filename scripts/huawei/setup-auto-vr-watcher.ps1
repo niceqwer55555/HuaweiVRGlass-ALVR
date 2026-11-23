@@ -4,6 +4,10 @@ Install / remove the auto-VR watcher as a per-user Startup task. No admin needed
 
   .\setup-auto-vr-watcher.ps1          # install (autostart + start now)
   .\setup-auto-vr-watcher.ps1 -Remove  # remove autostart
+
+Run this once from the server folder on any new PC: the generated Startup
+launcher points at auto-vr-watcher.ps1 next to THIS script, so it follows the
+server folder wherever it is copied (no fixed drive/path baked in).
 #>
 [CmdletBinding()]
 param([switch]$Remove)

@@ -29,22 +29,43 @@ param(
 $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
-# Resolve the dashboard/deployment dir: prefer our parent's artifacts layout.
-$artCandidates = @(
-    $scriptDir,
-    (Join-Path $scriptDir '..'),
-    'D:\PY\1\artifacts\HuaweiVRGlass-ALVR-Windows-v20.14.1'
-)
-$art = $artCandidates | Where-Object {
-    $_ -and (Test-Path -LiteralPath (Join-Path $_ 'driver.vrdrivermanifest') -PathType Leaf)
-} | Select-Object -First 1
-if (-not $art) { throw "Dashboard dir (with driver.vrdrivermanifest) not found; pass the folder via -?" }
-$art = (Resolve-Path -LiteralPath $art).Path
+# The server directory IS the script's own directory - nothing hardcoded.
+# This folder travels with the deployment package to any PC / any drive.
+$art = (Resolve-Path -LiteralPath $scriptDir).Path
 
 $alvrDir = $art
 $huaweiDir = Join-Path $art 'huawei-driver'
 $vrpathPath = Join-Path $env:LOCALAPPDATA 'openvr\openvrpaths.vrpath'
-$steamSettings = 'D:\Program Files\Steam\steamapps\common\SteamVR\config\steamvr.vrsettings'
+
+# Resolve SteamVR's config from openvrpaths.vrpath (no fixed drive/path).
+# Fall back to a few conventional Steam installs only if not registered yet.
+function Resolve-SteamVrSettings {
+    if (Test-Path -LiteralPath $vrpathPath -PathType Leaf) {
+        try {
+            $vp = Get-Content -LiteralPath $vrpathPath -Raw | ConvertFrom-Json
+            foreach ($c in @($vp.config)) {
+                if (-not $c) { continue }
+                $candidate = Join-Path $c 'steamvr.vrsettings'
+                if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+            }
+            foreach ($r in @($vp.runtime)) {
+                if (-not $r) { continue }
+                # runtime dir's ../config is also used by portable SteamVR
+                $candidate = Join-Path (Split-Path -Parent $r) 'config\steamvr.vrsettings'
+                if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+            }
+        } catch {}
+    }
+    $programDirs = @($env:ProgramFiles, ${env:ProgramFiles(x86)}, "$env:LOCALAPPDATA\Programs")
+    foreach ($base in $programDirs) {
+        if (-not $base) { continue }
+        $candidate = Join-Path $base 'Steam\steamapps\common\SteamVR\config\steamvr.vrsettings'
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+    }
+    return $null
+}
+$steamSettings = Resolve-SteamVrSettings
+if (-not $steamSettings) { throw 'SteamVR steamvr.vrsettings not found (start SteamVR once, or place its config path in openvrpaths.vrpath)' }
 $sidecar = Join-Path $art 'hmd_drivers.json'
 $edidFile = Join-Path $art 'glasses_edid.txt'
 
