@@ -1,0 +1,35 @@
+{ 
+	"driver_huaweiVR":
+	{
+	"enable" : true,
+	"serialNumber" : "1234",
+	"modelNumber" : "ViveMV",
+	"alwaysConnected" : true,
+	"windowX" : 0,
+	"windowY" : -1600,
+	"windowWidth" : 3200,
+	"windowHeight" : 1600,
+	"renderWidth" : 1600,
+	"renderHeight" : 1600,
+	"secondsFromVsyncToPhotons" : 0.01111111,
+	"displayFrequency" : 90.0,
+	"roomSetup" : false,
+	"inputEdid" : false,
+	"directModeEdidPid" : 2,
+	"directModeEdidVid" : 63010,
+	"inputViewHeightFromGround" : 1.70,
+	"usingExternalResourceFile" : true,
+	"additionalLatencyInSeconds": 0.008,
+	"displayWidth": 3200,
+	"displayHeight": 1600,
+	"displayRefreshRateNumerator": 90,
+	"displayRefreshRateDenominator": 1,
+	"adapterIndex": -1
+	},
+  "Nolo_Global": 
+  {
+    "Company":"Huawei",
+    "TimeOffSetLeft": 0.014,
+    "TimeOffSetRight": 0.014
+  }
+}

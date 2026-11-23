@@ -1,0 +1,1 @@
+This driver lets you use the HUAWEI VR Glass 6DoF Motion Tracking Kit to play SteamVR games. If you need to update the 6DoF Tracking Kit, please download Huawei PC VR Assistant.

@@ -1,0 +1,189 @@
+Debug 2026-10-22 20:12:28:0928 [XmlFile::GetKeyStatus] In Path
+Debug 2026-10-22 20:12:28:0931 [XmlFile::GetKeyStatus] Path  D:\Program Files (x86)\HwPCVR Assistant 
+Debug 2026-10-22 20:12:28:0933 [XmlFile::GetKeyStatus] Out 
+Debug 2026-10-22 20:12:28:0934 [XmlOpt::ReadXmlFile] In
+Debug 2026-10-22 20:12:28:0939 [XmlOpt::ReadCommonXml] In
+Debug 2026-10-22 20:12:28:0941 [XmlOpt::ReadCommonXml] algorithmVersion 49.48
+Debug 2026-10-22 20:12:28:0943 [XmlOpt::ReadCommonXml] hardwareVersion null
+Debug 2026-10-22 20:12:28:0945 [XmlOpt::ReadCommonXml] blueToothVersion null
+Debug 2026-10-22 20:12:28:0946 [XmlOpt::ReadCommonXml] cameraHash 01f259348ce648047e4afe7d75bb0f42c8f7c9d5d757b836373775b107174b96bc
+Debug 2026-10-22 20:12:28:0947 [XmlOpt::ReadCommonXml] leftHandleHash 0111c4b31f90f771ad675e85be731a41ff29f04584f9752f8f554b23f7039de846
+Debug 2026-10-22 20:12:28:0948 [XmlOpt::ReadCommonXml] rightHandleHash 0130e74011dd2d75fb35315e507e447d3a6c38254dc982351cd1b9895ef6b99157
+Debug 2026-10-22 20:12:28:0950 [XmlOpt::ReadCommonXml] Out
+Debug 2026-10-22 20:12:28:0951 [XmlOpt::ReadMoudleParaXml] In
+Debug 2026-10-22 20:12:28:0952 [XmlOpt::ReadMoudleParaXml] Out
+Debug 2026-10-22 20:12:28:0955 [XmlOpt::ReadHandlerModuleParaXml] In
+Info  2026-10-22 20:12:28:0956 [XmlOpt::ReadHandlerModuleParaXml] hander node Handler1: read end
+Info  2026-10-22 20:12:28:0958 [XmlOpt::ReadHandlerModuleParaXml] hander node Handler2: read end
+Info  2026-10-22 20:12:28:0959 [XmlOpt::ReadHandlerModuleParaXml] hander node num: 2
+Debug 2026-10-22 20:12:28:0960 [XmlOpt::ReadHandlerModuleParaXml] Out
+Info  2026-10-22 20:12:28:0962 [XmlOpt::ReadXmlFile] mCommonPara algorithmVersion null
+Error 2026-10-22 20:12:28:0962 [XmlOpt::ReadXmlFile] Out
+Info  2026-10-22 20:12:28:0963 [XmlFile::ReadXmlFile] In
+Info  2026-10-22 20:12:28:0964 [XmlFile::ReadXmlFile] mCommonPara algorithmVersion null
+Info  2026-10-22 20:12:28:0965 [XmlFile::ReadXmlFile] Out
+Debug 2026-10-22 20:12:28:0975 [XmlFile::Check6DOFDevicePlugin] ReadFile count 7
+Debug 2026-10-22 20:12:28:0977 [XmlFile::ReadBuffer] In camera 
+Debug 2026-10-22 20:12:29:0040 [XmlFile::GetCalibrationParameter] DeviceType camera
+Debug 2026-10-22 20:12:29:0041 [XmlFile::GetCalibrationParameterHash] In  Type camera 
+Debug 2026-10-22 20:12:29:0047 [XmlFile::GetCalibrationParameterHash] ReadFile count 37
+Debug 2026-10-22 20:12:29:0048 [XmlFile::GetCalibrationParameter] Type 0 newHash 013468e2daba0638be6f33966efcdf4709f4f0f30fea8101e5b3b45d7576fc6254 
+Debug 2026-10-22 20:12:29:0152 [XmlFile::GetCalibrationParameter] Type 0 oldHash 01f259348ce648047e4afe7d75bb0f42c8f7c9d5d757b836373775b107174b96bc 
+Debug 2026-10-22 20:12:29:0158 [XmlFile::GetReceiveData] packages number 22 index 1 buffer size 45 ReadFile Count 36 raw data 0003320000003000000003000000030000000000000000000000be030000010a01000000000000000000000000
+Debug 2026-10-22 20:12:29:0251 [XmlFile::GetReceiveData] packages number 22 index 2 buffer size 45 ReadFile Count 37 raw data 000000000000000000000000000000c8feffff0080020000e0010000000070410100000000000000007b14ae47
+Debug 2026-10-22 20:12:29:0346 [XmlFile::GetReceiveData] packages number 22 index 3 buffer size 45 ReadFile Count 38 raw data e17a843f9998ad52f1619ebfa04a348d3e5d6d4058cc5a4694616d40ea90e3d2490a7440a648f1937e7e6f4002
+Debug 2026-10-22 20:12:29:0439 [XmlFile::GetReceiveData] packages number 22 index 4 buffer size 45 ReadFile Count 36 raw data 02ece201b1af87ce3f50546369233dc6bf00000000000000001924bd47dabeaa3fa459d785228b77bfa7cd7dc4
+Debug 2026-10-22 20:12:29:0535 [XmlFile::GetReceiveData] packages number 22 index 5 buffer size 45 ReadFile Count 35 raw data 920c343f5b4083ba4711133f000000000000000000000000000000000000000000000000000000004cad101331
+Debug 2026-10-22 20:12:29:0632 [XmlFile::GetReceiveData] packages number 22 index 6 buffer size 45 ReadFile Count 36 raw data 05e43f7c104cf8b12fe83f60cbe21a4dacbdbfee21bdeab1c7c33fa069c23feb166e3f61233271c56bb4bf40dd
+Debug 2026-10-22 20:12:29:0727 [XmlFile::GetReceiveData] packages number 22 index 7 buffer size 45 ReadFile Count 35 raw data 6f81357f553f000000000000000000000000000000000000000000000000000000000000f03f00000000000000
+Debug 2026-10-22 20:12:29:0824 [XmlFile::GetReceiveData] packages number 22 index 8 buffer size 45 ReadFile Count 36 raw data 00000000000000000000000000000000008d294a39000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:29:0921 [XmlFile::GetReceiveData] packages number 22 index 9 buffer size 45 ReadFile Count 37 raw data 00000000000000000180020000e0010000000070410100000000000000007b14ae47e17a843f9998ad52f1619e
+Debug 2026-10-22 20:12:30:0016 [XmlFile::GetReceiveData] packages number 22 index 10 buffer size 45 ReadFile Count 37 raw data bfe536503f6d546d402efd4754775c6d4047e3cc11ed15744035632bf3eef16d400202ac01a632b3c4ce3fe65e
+Debug 2026-10-22 20:12:30:0110 [XmlFile::GetReceiveData] packages number 22 index 11 buffer size 45 ReadFile Count 36 raw data 6846d36fc7bf00000000000000000b196fb13fcbaf3f78b014dde8c281bf01ec148d0953d3be663cb8ddd11c10
+Debug 2026-10-22 20:12:30:0207 [XmlFile::GetReceiveData] packages number 22 index 12 buffer size 45 ReadFile Count 37 raw data 3f00000000000000000000803f000000000000000000000000000000000fc0b6d413f1e73faeff22458739e43f
+Debug 2026-10-22 20:12:30:0303 [XmlFile::GetReceiveData] packages number 22 index 13 buffer size 45 ReadFile Count 37 raw data e2db889e32c6c33f63a1dc2630a5c0bf10eee65c4e1a603fba7a9efcf696a43f08cc3bcec8406b3f1b41fcba46
+Debug 2026-10-22 20:12:30:0399 [XmlFile::GetReceiveData] packages number 22 index 14 buffer size 45 ReadFile Count 37 raw data 7b7cbfdc5dcc3dec46d8bf66f0ffeb60e5c6bfe50e1038890ced3f74de7ae0a6f3bbbfcfb16f1a2b46963f1376
+Debug 2026-10-22 20:12:30:0495 [XmlFile::GetReceiveData] packages number 22 index 15 buffer size 45 ReadFile Count 36 raw data 9bf1bbf1a6bf8d294a390000000000000000000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:30:0590 [XmlFile::GetReceiveData] packages number 22 index 16 buffer size 45 ReadFile Count 36 raw data 7a4400007a440192d606ab929b72bfbb887c71630568bfb83935082e937f3f3ca8cdf8ee27f03fe1327dc32ec6
+Debug 2026-10-22 20:12:30:0686 [XmlFile::GetReceiveData] packages number 22 index 17 buffer size 45 ReadFile Count 38 raw data ef3fec4b8a004df4ef3fc8a935807b484fbf570d1a52260f64bf120394b9da3c83bfd4b3cabcea63c5bfba34b8
+Debug 2026-10-22 20:12:30:0780 [XmlFile::GetReceiveData] packages number 22 index 18 buffer size 45 ReadFile Count 36 raw data 00ea52a9bfd3e6fd0d1b6e84bf444b9a1cb9dcef3f87d6c1ea25eeef3f290e740a7803f03fbfc3df32fa1d45bf
+Debug 2026-10-22 20:12:30:0878 [XmlFile::GetReceiveData] packages number 22 index 19 buffer size 45 ReadFile Count 37 raw data 792f584f5e4359bfcbcf721b4195793f571f52cbadc774bf9112fbba5ebf06bf5210aa3805952fbf4705eff2e4
+Debug 2026-10-22 20:12:30:0971 [XmlFile::GetReceiveData] packages number 22 index 20 buffer size 45 ReadFile Count 37 raw data ffef3fa03715a930b6303ffa7e6abc7493683f691d554d1075ff3efa7e6abc7493483f00000000000000000000
+Debug 2026-10-22 20:12:31:0066 [XmlFile::GetReceiveData] packages number 22 index 21 buffer size 45 ReadFile Count 36 raw data 00000000000000000000000000000000000000000000200000000000000000000000000000000000000050dd4a
+Debug 2026-10-22 20:12:31:0161 [XmlFile::GetReceiveData] packages number 22 index 22 buffer size 45 ReadFile Count 36 raw data 11fc16de1b4e2193da6634d6470000000000000000000000000000000000000000000000000000000000000000
+Info  2026-10-22 20:12:31:0252 [XmlFile::AnalysisOTPBuffer] algorithmVersion 50.48
+Info  2026-10-22 20:12:31:0253 [XmlFile::AnalysisOTPBuffer] hardwareVersion 3.3
+Info  2026-10-22 20:12:31:0254 [XmlFile::AnalysisOTPBuffer] blueToothVersion 0.0
+Debug 2026-10-22 20:12:31:0255 [XmlFile::ReadBuffer] camera1: fps 15 width 640 heigth 480 
+Debug 2026-10-22 20:12:31:0256 [XmlFile::ReadBuffer] camera2: fps 15 width 640 heigth 480 
+Debug 2026-10-22 20:12:31:0257 [XmlFile::ReadBuffer] Parsing the locator parameters successfully
+
+Debug 2026-10-22 20:12:31:0257 [XmlFile::ReadBuffer] In leftHandler 
+Debug 2026-10-22 20:12:31:0315 [XmlFile::GetCalibrationParameter] DeviceType leftHandler
+Debug 2026-10-22 20:12:31:0316 [XmlFile::GetCalibrationParameterHash] In  Type leftHandler 
+Debug 2026-10-22 20:12:31:0330 [XmlFile::GetCalibrationParameterHash] ReadFile count 13
+Debug 2026-10-22 20:12:31:0332 [XmlFile::GetCalibrationParameter] Type 1 newHash 01b22a70970fa085f0759b76240d164e61d257a69760c7e04816969d8264080dc5 
+Debug 2026-10-22 20:12:31:0443 [XmlFile::GetCalibrationParameter] Type 1 oldHash 0111c4b31f90f771ad675e85be731a41ff29f04584f9752f8f554b23f7039de846 
+Debug 2026-10-22 20:12:31:0461 [XmlFile::GetReceiveData] packages number 29 index 1 buffer size 28 ReadFile Count 48 raw data 01013100000030000000000000000000000000000000000000008003
+Debug 2026-10-22 20:12:31:0573 [XmlFile::GetReceiveData] packages number 29 index 2 buffer size 28 ReadFile Count 49 raw data 0000010a010000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:31:0684 [XmlFile::GetReceiveData] packages number 29 index 3 buffer size 28 ReadFile Count 49 raw data 00000000f200000080f5e91799f57abfc09ed189dc02ed3f892c5ff7
+Debug 2026-10-22 20:12:31:0796 [XmlFile::GetReceiveData] packages number 29 index 4 buffer size 28 ReadFile Count 50 raw data 3011813fe929be7fbcffdabf223bd151e2f2923f57a10d40fbc3553f
+Debug 2026-10-22 20:12:31:0908 [XmlFile::GetReceiveData] packages number 29 index 5 buffer size 28 ReadFile Count 51 raw data f2d518472a56a23f0000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:32:0019 [XmlFile::GetReceiveData] packages number 29 index 6 buffer size 28 ReadFile Count 51 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:32:0130 [XmlFile::GetReceiveData] packages number 29 index 7 buffer size 28 ReadFile Count 50 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:32:0242 [XmlFile::GetReceiveData] packages number 29 index 8 buffer size 28 ReadFile Count 50 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:32:0353 [XmlFile::GetReceiveData] packages number 29 index 9 buffer size 28 ReadFile Count 51 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:32:0464 [XmlFile::GetReceiveData] packages number 29 index 10 buffer size 28 ReadFile Count 51 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:32:0576 [XmlFile::GetReceiveData] packages number 29 index 11 buffer size 28 ReadFile Count 51 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:32:0688 [XmlFile::GetReceiveData] packages number 29 index 12 buffer size 28 ReadFile Count 51 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:32:0799 [XmlFile::GetReceiveData] packages number 29 index 13 buffer size 28 ReadFile Count 51 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:32:0912 [XmlFile::GetReceiveData] packages number 29 index 14 buffer size 28 ReadFile Count 51 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:33:0022 [XmlFile::GetReceiveData] packages number 29 index 15 buffer size 28 ReadFile Count 51 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:33:0124 [XmlFile::GetReceiveData] packages number 29 index 16 buffer size 28 ReadFile Count 42 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:33:0224 [XmlFile::GetReceiveData] packages number 29 index 17 buffer size 28 ReadFile Count 46 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:33:0336 [XmlFile::GetReceiveData] packages number 29 index 18 buffer size 28 ReadFile Count 47 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:33:0448 [XmlFile::GetReceiveData] packages number 29 index 19 buffer size 28 ReadFile Count 48 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:33:0559 [XmlFile::GetReceiveData] packages number 29 index 20 buffer size 28 ReadFile Count 47 raw data 00000000fca9f1d24d62a0bf00000000000000000000000000000000
+Debug 2026-10-22 20:12:33:0670 [XmlFile::GetReceiveData] packages number 29 index 21 buffer size 28 ReadFile Count 46 raw data 00000000000000000000000000000000000000c8420000c84201f1b2
+Debug 2026-10-22 20:12:33:0782 [XmlFile::GetReceiveData] packages number 29 index 22 buffer size 28 ReadFile Count 48 raw data 36e0cf9c82bf688e69e24980a03fd85105f596f650bfda20c3b181cc
+Debug 2026-10-22 20:12:33:0893 [XmlFile::GetReceiveData] packages number 29 index 23 buffer size 28 ReadFile Count 47 raw data ef3f5b6916afcfdfef3fb3a709918eb8ef3f12045dc69bd66d3f13a4
+Debug 2026-10-22 20:12:34:0004 [XmlFile::GetReceiveData] packages number 29 index 24 buffer size 28 ReadFile Count 46 raw data 669c8d228abf4d35bfa17d8f40bf8e933a714ea7c1bf8078673760d7
+Debug 2026-10-22 20:12:34:0117 [XmlFile::GetReceiveData] packages number 29 index 25 buffer size 28 ReadFile Count 46 raw data a83f844fe312495db23f716a3c27a09def3fe6c5c4c3b1ceef3f1de3
+Debug 2026-10-22 20:12:34:0228 [XmlFile::GetReceiveData] packages number 29 index 26 buffer size 28 ReadFile Count 46 raw data 3afa1581ef3f05d041967165633fe8b68fa77a20913ffaf8655cf7da
+Debug 2026-10-22 20:12:34:0339 [XmlFile::GetReceiveData] packages number 29 index 27 buffer size 28 ReadFile Count 46 raw data 40bf84e22f09ff0a53bfc0b421851acc793ff378af97162342bf7cd1
+Debug 2026-10-22 20:12:34:0451 [XmlFile::GetReceiveData] packages number 29 index 28 buffer size 28 ReadFile Count 49 raw data 04abd4ffef3fa03715a930b6303ffa7e6abc7493683f691d554d1075
+Debug 2026-10-22 20:12:34:0562 [XmlFile::GetReceiveData] packages number 29 index 29 buffer size 28 ReadFile Count 47 raw data ff3efa7e6abc7493483f000000000000000000000000000000000000
+Debug 2026-10-22 20:12:34:0769 [XmlFile::GetCalibrationParameter] DeviceType rightHandler
+Debug 2026-10-22 20:12:34:0770 [XmlFile::GetCalibrationParameterHash] In  Type rightHandler 
+Debug 2026-10-22 20:12:34:0788 [XmlFile::GetCalibrationParameterHash] ReadFile count 49
+Debug 2026-10-22 20:12:34:0790 [XmlFile::GetCalibrationParameter] Type 2 newHash 01cddeaf2ebee3eacef23dc57312dd40f953b7a6a0404e63996142705c3079ee43 
+Debug 2026-10-22 20:12:34:0895 [XmlFile::GetCalibrationParameter] Type 2 oldHash 0130e74011dd2d75fb35315e507e447d3a6c38254dc982351cd1b9895ef6b99157 
+Debug 2026-10-22 20:12:34:0919 [XmlFile::GetReceiveData] packages number 29 index 1 buffer size 28 ReadFile Count 53 raw data 01013100000030000000000000000000000000000000000000008003
+Debug 2026-10-22 20:12:35:0031 [XmlFile::GetReceiveData] packages number 29 index 2 buffer size 28 ReadFile Count 55 raw data 0000010a010000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:35:0142 [XmlFile::GetReceiveData] packages number 29 index 3 buffer size 28 ReadFile Count 54 raw data 00000000f2000000227dfbe55de4ecbf71935a7e2f2b803febfe7163
+Debug 2026-10-22 20:12:35:0253 [XmlFile::GetReceiveData] packages number 29 index 4 buffer size 28 ReadFile Count 53 raw data bf81dbbf017cb42f72b8753fa09bc9d765118cbf8849a68e1f0c593f
+Debug 2026-10-22 20:12:35:0365 [XmlFile::GetReceiveData] packages number 29 index 5 buffer size 28 ReadFile Count 53 raw data bd0719f78b0aa33f0000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:35:0476 [XmlFile::GetReceiveData] packages number 29 index 6 buffer size 28 ReadFile Count 51 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:35:0587 [XmlFile::GetReceiveData] packages number 29 index 7 buffer size 28 ReadFile Count 50 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:35:0699 [XmlFile::GetReceiveData] packages number 29 index 8 buffer size 28 ReadFile Count 51 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:35:0811 [XmlFile::GetReceiveData] packages number 29 index 9 buffer size 28 ReadFile Count 51 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:35:0922 [XmlFile::GetReceiveData] packages number 29 index 10 buffer size 28 ReadFile Count 50 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:36:0034 [XmlFile::GetReceiveData] packages number 29 index 11 buffer size 28 ReadFile Count 51 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:36:0145 [XmlFile::GetReceiveData] packages number 29 index 12 buffer size 28 ReadFile Count 50 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:36:0256 [XmlFile::GetReceiveData] packages number 29 index 13 buffer size 28 ReadFile Count 49 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:36:0368 [XmlFile::GetReceiveData] packages number 29 index 14 buffer size 28 ReadFile Count 49 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:36:0479 [XmlFile::GetReceiveData] packages number 29 index 15 buffer size 28 ReadFile Count 48 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:36:0590 [XmlFile::GetReceiveData] packages number 29 index 16 buffer size 28 ReadFile Count 48 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:36:0703 [XmlFile::GetReceiveData] packages number 29 index 17 buffer size 28 ReadFile Count 50 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:36:0814 [XmlFile::GetReceiveData] packages number 29 index 18 buffer size 28 ReadFile Count 49 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:36:0925 [XmlFile::GetReceiveData] packages number 29 index 19 buffer size 28 ReadFile Count 49 raw data 00000000000000000000000000000000000000000000000000000000
+Debug 2026-10-22 20:12:37:0037 [XmlFile::GetReceiveData] packages number 29 index 20 buffer size 28 ReadFile Count 50 raw data 00000000fca9f1d24d62a0bf00000000000000000000000000000000
+Debug 2026-10-22 20:12:37:0148 [XmlFile::GetReceiveData] packages number 29 index 21 buffer size 28 ReadFile Count 50 raw data 000000000000000000000000000000000000007a4300007a4301fa61
+Debug 2026-10-22 20:12:37:0259 [XmlFile::GetReceiveData] packages number 29 index 22 buffer size 28 ReadFile Count 49 raw data 665ae899c4be176b852f450f793f9198777f0ae96dbf2d989986f2e2
+Debug 2026-10-22 20:12:37:0371 [XmlFile::GetReceiveData] packages number 29 index 23 buffer size 28 ReadFile Count 50 raw data ef3fb87e2f0b7effef3ffcef0cb595edef3f10ee675ffe8a6d3fc649
+Debug 2026-10-22 20:12:37:0482 [XmlFile::GetReceiveData] packages number 29 index 24 buffer size 28 ReadFile Count 49 raw data e32b21ca67bf21b57370b0b565bfd3c37fa80dde8c3f99b51664eab4
+Debug 2026-10-22 20:12:37:0594 [XmlFile::GetReceiveData] packages number 29 index 25 buffer size 28 ReadFile Count 50 raw data 7a3f7f295b9e3215b2bfef97da0844edef3f30ff7127b1eaef3ffb39
+Debug 2026-10-22 20:12:37:0706 [XmlFile::GetReceiveData] packages number 29 index 26 buffer size 28 ReadFile Count 52 raw data 6343f7e0ef3f6c6f6da0636260bf7ef74d91e81250bfd6536cb452c6
+Debug 2026-10-22 20:12:37:0817 [XmlFile::GetReceiveData] packages number 29 index 27 buffer size 28 ReadFile Count 52 raw data 603f002834879fbf5fbfe1d14134c74534bf6261b2deea67613f1396
+Debug 2026-10-22 20:12:37:0928 [XmlFile::GetReceiveData] packages number 29 index 28 buffer size 28 ReadFile Count 52 raw data 793af7ffef3fa03715a930b6303ffa7e6abc7493683f691d554d1075
+Debug 2026-10-22 20:12:38:0040 [XmlFile::GetReceiveData] packages number 29 index 29 buffer size 28 ReadFile Count 55 raw data ff3efa7e6abc7493483f000000000000000000000000000000000000
+Info  2026-10-22 20:12:38:0192 [XmlFile::AnalysisOTPBuffer] algorithmVersion 50.48
+Info  2026-10-22 20:12:38:0194 [XmlFile::AnalysisOTPBuffer] hardwareVersion 3.3
+Info  2026-10-22 20:12:38:0195 [XmlFile::AnalysisOTPBuffer] blueToothVersion 0.0
+Debug 2026-10-22 20:12:38:0196 [XmlFile::ReadBuffer] camera1: fps 15 width 640 heigth 480 
+Debug 2026-10-22 20:12:38:0198 [XmlFile::ReadBuffer] camera2: fps 15 width 640 heigth 480 
+Debug 2026-10-22 20:12:38:0199 [XmlFile::ReadBuffer] Parsing the locator parameters successfully
+
+Info  2026-10-22 20:12:38:0200 [XmlFile::AnalysisOTPBuffer] algorithmVersion 49.48
+Info  2026-10-22 20:12:38:0201 [XmlFile::AnalysisOTPBuffer] hardwareVersion 0.0
+Info  2026-10-22 20:12:38:0202 [XmlFile::AnalysisOTPBuffer] blueToothVersion 0.0
+Info  2026-10-22 20:12:38:0203 testddd::origT: 0.018505 0.001328 0.035814
+Info  2026-10-22 20:12:38:0204 testddd::OrigR: -0.643983 -0.018965 0.764804 -0.004903 0.999774 0.020664 -0.765024 0.009557 -0.643931
+Info  2026-10-22 20:12:38:0205 testddd::TransR: 0.643983 0.018965 -0.764804 0.004903 -0.999774 -0.020664 0.765024 -0.009557 0.643931
+Info  2026-10-22 20:12:38:0207 testddd::TransT: -0.015449 -0.001977 0.037205
+Info  2026-10-22 20:12:38:0208 [XmlFile::AnalysisOTPBuffer] algorithmVersion 49.48
+Info  2026-10-22 20:12:38:0209 [XmlFile::AnalysisOTPBuffer] hardwareVersion 0.0
+Info  2026-10-22 20:12:38:0210 [XmlFile::AnalysisOTPBuffer] blueToothVersion 0.0
+Info  2026-10-22 20:12:38:0211 testddd::origT: -0.013705 0.001529 0.037190
+Info  2026-10-22 20:12:38:0213 testddd::OrigR: 0.630429 -0.018814 0.776019 -0.009698 -0.999819 -0.016362 0.776186 0.002789 -0.630498
+Info  2026-10-22 20:12:38:0214 testddd::TransR: -0.630429 0.018814 -0.776019 0.009698 0.999819 0.016362 -0.776186 -0.002789 0.630498
+Info  2026-10-22 20:12:38:0215 testddd::TransT: -0.020191 0.002004 0.034082
+Debug 2026-10-22 20:12:38:0216 [XmlFile::ReadBuffer] imu1: gFPS 100 aFPS 100 
+Debug 2026-10-22 20:12:38:0217 [XmlFile::ReadBuffer] imu2: gFPS 250 aFPS 250 
+Debug 2026-10-22 20:12:38:0218 [XmlFile::ReadBuffer] Parsing the left handle parameters successfully
+
+Debug 2026-10-22 20:12:38:0219 [XmlFile::ReadBuffer] Parsing the right handle parameters successfully
+
+Debug 2026-10-22 20:12:38:0220 [XmlFile::RegWriteSetXmlStatus]: In
+Error 2026-10-22 20:12:38:0221 [XmlFile::RegWriteSetXmlStatus]: Get xml data success
+Debug 2026-10-22 20:12:38:0222 [XmlFile::RegWriteSetXmlStatus]: Out
+Debug 2026-10-22 20:12:38:0223 [XmlFile::GetXmlFile] In
+Debug 2026-10-22 20:12:38:0225 [XmlFile::GetXmlFile] defaultXml D:\Program Files (x86)\HwPCVR Assistant\steamVRDriver\huaweiVR\bin\win64\vrglass-handler-default.xml
+Debug 2026-10-22 20:12:38:0226 [XmlFile::GetXmlFile] newXml D:\Program Files (x86)\HwPCVR Assistant\steamVRDriver\huaweiVR\bin\win64\vrglass-handler.xml
+Debug 2026-10-22 20:12:38:0228 [XmlFile::GetXmlFile] XmlOptWrite
+Debug 2026-10-22 20:12:38:0229 [XmlOptWrite::WriteCommon] In
+Debug 2026-10-22 20:12:38:0230 [XmlOptWrite::WriteCommon] algorithmVersion 50.48
+Debug 2026-10-22 20:12:38:0231 [XmlOptWrite::WriteCommon] cameraHash 013468e2daba0638be6f33966efcdf4709f4f0f30fea8101e5b3b45d7576fc6254
+Debug 2026-10-22 20:12:38:0232 [XmlOptWrite::WriteCommon] leftHandleHash 01b22a70970fa085f0759b76240d164e61d257a69760c7e04816969d8264080dc5
+Debug 2026-10-22 20:12:38:0234 [XmlOptWrite::WriteCommon] rightHandleHash 01cddeaf2ebee3eacef23dc57312dd40f953b7a6a0404e63996142705c3079ee43
+Debug 2026-10-22 20:12:38:0235 [XmlOptWrite::WriteModulePara] In
+Debug 2026-10-22 20:12:38:0236 [XmlOptWrite::WriteCameraParaXml] In
+Debug 2026-10-22 20:12:38:0242 [XmlOptWrite::WriteCameraParaXml] Out
+Debug 2026-10-22 20:12:38:0244 [XmlOptWrite::WriteCameraParaXml] In
+Debug 2026-10-22 20:12:38:0245 [XmlOptWrite::WriteCameraParaXml] Out
+Debug 2026-10-22 20:12:38:0245 [XmlOptWrite::WriteImuParaXml] In
+Debug 2026-10-22 20:12:38:0246 [XmlOptWrite::WriteImuParaXml] Out
+Debug 2026-10-22 20:12:38:0247 [XmlOptWrite::WriteControllerPara] In
+Debug 2026-10-22 20:12:38:0248 [XmlOptWrite::WriteLedParaXml] In
+Debug 2026-10-22 20:12:38:0249 [XmlOptWrite::WriteLedParaXml] Out
+Debug 2026-10-22 20:12:38:0250 [XmlOptWrite::WriteImuParaXml] In
+Debug 2026-10-22 20:12:38:0250 [XmlOptWrite::WriteImuParaXml] Out
+Debug 2026-10-22 20:12:38:0251 [XmlOptWrite::WriteLedParaXml] In
+Debug 2026-10-22 20:12:38:0251 [XmlOptWrite::WriteLedParaXml] Out
+Debug 2026-10-22 20:12:38:0252 [XmlOptWrite::WriteImuParaXml] In
+Debug 2026-10-22 20:12:38:0253 [XmlOptWrite::WriteImuParaXml] Out
+Debug 2026-10-22 20:12:38:0254 [XmlOptWrite::WriteControllerPara] Out
+Debug 2026-10-22 20:12:38:0254 [XmlOptWrite::SaveXml] In
+Debug 2026-10-22 20:12:38:0258 [XmlOptWrite::SaveXml] In
+Debug 2026-10-22 20:12:38:0261 [XmlFile::GetXmlFile] Out
+Debug 2026-10-22 20:12:38:0262 [XmlFile::~XmlFile] In

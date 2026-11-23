@@ -1,0 +1,311 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<models>
+    <Common>
+        <logLevelSwitch>[ 0; 0; 0; 0; 0; 0]</logLevelSwitch>
+        <logModuleSwitch>[ 1; 1; 1; 1; 1]</logModuleSwitch>
+        <featureType>2</featureType>
+        <version>2</version>
+        <algorithmVersion>49.48</algorithmVersion>
+        <hardwareVersion>null</hardwareVersion>
+        <blueToothVersion>null</blueToothVersion>
+        <cameraHash>01f259348ce648047e4afe7d75bb0f42c8f7c9d5d757b836373775b107174b96bc</cameraHash>
+        <leftHandleHash>0111c4b31f90f771ad675e85be731a41ff29f04584f9752f8f554b23f7039de846</leftHandleHash>
+        <rightHandleHash>0130e74011dd2d75fb35315e507e447d3a6c38254dc982351cd1b9895ef6b99157</rightHandleHash>
+        <len>-1355277520</len>
+        <IMUNum>676</IMUNum>
+        <imupartLen>-224412162</imupartLen>
+        <checksum>204</checksum>
+    </Common>
+    <FOXCONN-ST CameraNum="2">
+        <Camera0_model name="imx600" version="">
+            <width>640</width>
+            <height>480</height>
+            <fps>15</fps>
+            <cameraid>0</cameraid>
+            <rollingMode>1</rollingMode>
+            <rsReadoutTime>0</rsReadoutTime>
+            <calibTShiftAETimeSec>0.01</calibTShiftAETimeSec>
+            <delayCam2IMU>-0.02986519861</delayCam2IMU>
+            <intrinsic>[ 235.6933352; 235.7248792; 319.559478; 246.0510125]</intrinsic>
+            <needUndist>1</needUndist>
+            <distorbMode>1</distorbMode>
+            <distorbParms>[ 0.2461989687; -0.1984932332; 0; 0.0757425404; -0.01260107695; 0; 0; 0]</distorbParms>
+            <calibrationAFCode>0</calibrationAFCode>
+            <afCompencateParms>[ 0; 0; 0; 0]</afCompencateParms>
+            <extrinsicTbc>[ 0.6300232251; 0.7524345963; -0.1206483274; 0.1495222235; 0.002585084669; -0.08457427321; 0.002357715585]</extrinsicTbc>
+            <extrinsicTcm>[ 0; 0; 0; 1; 0; 0; 0]</extrinsicTcm>
+            <pixelsSigma>0</pixelsSigma>
+        </Camera0_model>
+        <Camera1_model name="imx600" version="">
+            <width>640</width>
+            <height>480</height>
+            <fps>15</fps>
+            <cameraid>0</cameraid>
+            <rollingMode>1</rollingMode>
+            <rsReadoutTime>0</rsReadoutTime>
+            <calibTShiftAETimeSec>0.01</calibTShiftAETimeSec>
+            <delayCam2IMU>-0.02986519861</delayCam2IMU>
+            <intrinsic>[ 234.2281376; 234.2281376; 320.0301106; 242.2162791]</intrinsic>
+            <needUndist>1</needUndist>
+            <distorbMode>1</distorbMode>
+            <distorbParms>[ -0.1859483214; -0.1859483214; 0; 0.06624952254; -0.01027412169; 0; 0; 0]</distorbParms>
+            <calibrationAFCode>0</calibrationAFCode>
+            <afCompencateParms>[ 0; 0; 0; 0]</afCompencateParms>
+            <extrinsicTbc>[ -0.630183045; -0.630183045; -0.1522834543; 0.129895167; 0.001969974419; 0.03977795734; 0.003259015908]</extrinsicTbc>
+            <extrinsicTcm>[ 0.3784169812; 0.3784169812; 0.1745477575; -0.9090226293; -0.1129148788; 0.0219963436; -0.04723408693]</extrinsicTcm>
+            <pixelsSigma>0</pixelsSigma>
+        </Camera1_model>
+        <imu_model name="st" version="">
+            <imuid>0</imuid>
+            <gFPS>500</gFPS>
+            <aFPS>500</aFPS>
+            <gravityConstant>9.8</gravityConstant>
+            <needCompensate>1</needCompensate>
+            <gyroBias>[ -0.003289935425; -0.008782483092; 0.005958275333]</gyroBias>
+            <gyroScale>[ 1.011238626; 0.9966098798; 0.9969219605]</gyroScale>
+            <gyroMisalign>[ -0.0004616316574; -0.007395517189; -0.009409443077]</gyroMisalign>
+            <accelBias>[ -0.2380455645; 0.03808864914; -0.0717991335]</accelBias>
+            <accelScale>[ 0.9995668223; 1.002730865; 1.003577983]</accelScale>
+            <accelMisalign>[ -0.0002505130934; 0.002513620247; -5.446963597e-05]</accelMisalign>
+            <gyro2accel>[ -0.002188186711; 0.002381009985; -0.002172040592; 0.9999924124]</gyro2accel>
+            <gyroNoiseSigma>0.000255</gyroNoiseSigma>
+            <accelNoiseSigma>0.003</accelNoiseSigma>
+            <gyroBiasSigma>3e-05</gyroBiasSigma>
+            <accelBiasSigma>0.00075</accelBiasSigma>
+        </imu_model>
+    </FOXCONN-ST>
+    <Handler-Default>
+        <Handler1 name="default" version="1.0">
+            <handleId>0</handleId>
+            <handlerLedParam>
+                <data>
+                    <index>0</index>
+                    <position>[ -0.03461199999; -0.01824500039; -0.0004009999975]</position>
+                    <normals>[ -0.8688790202; -0.4809910059; -0.1170329973]</normals>
+                </data>
+                <data>
+                    <index>1</index>
+                    <position>[ -0.02458499931; -0.02863300033; 0.01512499992]</position>
+                    <normals>[ -0.5897489786; -0.7680559754; 0.2495699972]</normals>
+                </data>
+                <data>
+                    <index>2</index>
+                    <position>[ -0.02280299924; -0.03153999895; -0.0006489999942]</position>
+                    <normals>[ -0.6228399873; -0.7737179995; -0.1158929989]</normals>
+                </data>
+                <data>
+                    <index>3</index>
+                    <position>[ -0.01320699975; -0.03861699998; 0.007300000172]</position>
+                    <normals>[ -0.5482569933; -0.8268730044; 0.1252830029]</normals>
+                </data>
+                <data>
+                    <index>4</index>
+                    <position>[ 0.02163100056; -0.04873700067; -0.0004689999914]</position>
+                    <normals>[ 0.07783900201; -0.9612460136; -0.2644760013]</normals>
+                </data>
+                <data>
+                    <index>5</index>
+                    <position>[ 0.02324599959; -0.04717199877; 0.0147040002]</position>
+                    <normals>[ 0.03195299953; -0.8890039921; 0.4567399919]</normals>
+                </data>
+                <data>
+                    <index>6</index>
+                    <position>[ 0.04557599872; -0.03809799999; -0.0001979999943]</position>
+                    <normals>[ 0.6457059979; -0.629562974; -0.4321050048]</normals>
+                </data>
+                <data>
+                    <index>7</index>
+                    <position>[ 0.05782699957; -0.01700400002; 0.01553000044]</position>
+                    <normals>[ 0.7804070115; -0.4987129867; 0.3771620095]</normals>
+                </data>
+                <data>
+                    <index>8</index>
+                    <position>[ 0.05781399831; 0.017368; 0.002092000097]</position>
+                    <normals>[ 0.8919190168; 0.211048007; -0.3999249935]</normals>
+                </data>
+                <data>
+                    <index>9</index>
+                    <position>[ 0.05349399894; 0.02955600061; 0.01378799975]</position>
+                    <normals>[ 0.8236920238; 0.4871709943; 0.2901639938]</normals>
+                </data>
+                <data>
+                    <index>10</index>
+                    <position>[ 0.04351000115; 0.03948900104; -0.0009319999954]</position>
+                    <normals>[ 0.5988839865; 0.6599860191; -0.4536029994]</normals>
+                </data>
+                <data>
+                    <index>11</index>
+                    <position>[ 0.02411299944; 0.0469009988; 0.01507699955]</position>
+                    <normals>[ 0.0424680002; 0.9136919975; 0.4041830003]</normals>
+                </data>
+                <data>
+                    <index>12</index>
+                    <position>[ 0.01345700026; 0.04914300144; 0.004269999918]</position>
+                    <normals>[ -0.1088100001; 0.9940479994; -0.005336000118]</normals>
+                </data>
+                <data>
+                    <index>13</index>
+                    <position>[ -0.01466600038; 0.0375970006; -5.600000077e-05]</position>
+                    <normals>[ -0.5571150184; 0.8191779852; -0.1360819936]</normals>
+                </data>
+                <data>
+                    <index>14</index>
+                    <position>[ -0.02023000084; 0.03164200112; 0.01525500044]</position>
+                    <normals>[ -0.5296429992; 0.787225008; 0.3158389926]</normals>
+                </data>
+                <data>
+                    <index>15</index>
+                    <position>[ -0.03329300135; 0.02099700086; 0.002231999999]</position>
+                    <normals>[ -0.8292019963; 0.5555250049; -0.06177899987]</normals>
+                </data>
+            </handlerLedParam>
+            <ledBBoxPosition>
+                <data>[ -0.0352627486; 0.05222899839; -0.003704000032]</data>
+                <data>[ 0.06193425134; 0.05222899839; -0.003704000032]</data>
+                <data>[ -0.0352627486; 0.05222899839; 0.01688900031]</data>
+                <data>[ 0.06193425134; 0.05222899839; 0.01688900031]</data>
+                <data>[ -0.0352627486; -0.05154399946; -0.003704000032]</data>
+                <data>[ 0.06193425134; -0.05154399946; -0.003704000032]</data>
+                <data>[ -0.0352627486; -0.05154399946; 0.01688900031]</data>
+                <data>[ 0.06193425134; -0.05154399946; 0.01688900031]</data>
+            </ledBBoxPosition>
+            <reserved>[ 0; 0; 0]</reserved>
+            <imu1 name="st" version="">
+                <imuid>0</imuid>
+                <gFPS>250</gFPS>
+                <aFPS>250</aFPS>
+                <handlerDelayCam2IMU>-0.032</handlerDelayCam2IMU>
+                <gravityConstant>9.8</gravityConstant>
+                <needCompensate>1</needCompensate>
+                <gyroBias>[ 0.007812924654; 0.0003743302609; -0.004067181702]</gyroBias>
+                <gyroScale>[ 1.00005167; 1.001241369; 1.001162289]</gyroScale>
+                <gyroMisalign>[ 0.002942513432; -0.01169864285; 0.003521607075]</gyroMisalign>
+                <accelBias>[ -0.002828234288; -0.01276086323; -0.01967703831]</accelBias>
+                <accelScale>[ 0.996156182; 0.9927915389; 0.9938626199]</accelScale>
+                <accelMisalign>[ -0.001344042074; 0.002990715351; 0.006223852832]</accelMisalign>
+                <gyro2accel>[ 0.002103510417; 0.005288729498; 0.001591354828; 0.9999825359]</gyro2accel>
+                <gyroNoiseSigma>0.000255</gyroNoiseSigma>
+                <accelNoiseSigma>0.003</accelNoiseSigma>
+                <gyroBiasSigma>3e-05</gyroBiasSigma>
+                <accelBiasSigma>0.00075</accelBiasSigma>
+                <extrinsicThi>[ 0.001290412318; -0.9120455477; -0.002399960269; -0.4100798629; -0.01317864319; -0.00336586252; 0.03287582035]</extrinsicThi>
+            </imu1>
+        </Handler1>
+        <Handler2 name="default" version="1.0">
+            <handleId>1</handleId>
+            <handlerLedParam>
+                <data>
+                    <index>0</index>
+                    <position>[ -0.03461199999; 0.01824500039; -0.0004009999975]</position>
+                    <normals>[ -0.8688790202; 0.4809910059; -0.1170329973]</normals>
+                </data>
+                <data>
+                    <index>1</index>
+                    <position>[ -0.02458499931; 0.02863300033; 0.01512499992]</position>
+                    <normals>[ -0.5897489786; 0.7680559754; 0.2495699972]</normals>
+                </data>
+                <data>
+                    <index>2</index>
+                    <position>[ -0.02280299924; 0.03153999895; -0.0006489999942]</position>
+                    <normals>[ -0.6228399873; 0.7737179995; -0.1158929989]</normals>
+                </data>
+                <data>
+                    <index>3</index>
+                    <position>[ -0.01320699975; 0.03861699998; 0.007300000172]</position>
+                    <normals>[ -0.5482569933; 0.8268730044; 0.1252830029]</normals>
+                </data>
+                <data>
+                    <index>4</index>
+                    <position>[ 0.02163100056; 0.04873700067; -0.0004689999914]</position>
+                    <normals>[ 0.07783900201; 0.9612460136; -0.2644760013]</normals>
+                </data>
+                <data>
+                    <index>5</index>
+                    <position>[ 0.02324599959; 0.04717199877; 0.0147040002]</position>
+                    <normals>[ 0.03195299953; 0.8890039921; 0.4567399919]</normals>
+                </data>
+                <data>
+                    <index>6</index>
+                    <position>[ 0.04557599872; 0.03809799999; -0.0001979999943]</position>
+                    <normals>[ 0.6457059979; 0.629562974; -0.4321050048]</normals>
+                </data>
+                <data>
+                    <index>7</index>
+                    <position>[ 0.05782699957; 0.01700400002; 0.01553000044]</position>
+                    <normals>[ 0.7804070115; 0.4987129867; 0.3771620095]</normals>
+                </data>
+                <data>
+                    <index>8</index>
+                    <position>[ 0.05781399831; -0.017368; 0.002092000097]</position>
+                    <normals>[ 0.8919190168; -0.211048007; -0.3999249935]</normals>
+                </data>
+                <data>
+                    <index>9</index>
+                    <position>[ 0.05349399894; -0.02955600061; 0.01378799975]</position>
+                    <normals>[ 0.8236920238; -0.4871709943; 0.2901639938]</normals>
+                </data>
+                <data>
+                    <index>10</index>
+                    <position>[ 0.04351000115; -0.03948900104; -0.0009319999954]</position>
+                    <normals>[ 0.5988839865; -0.6599860191; -0.4536029994]</normals>
+                </data>
+                <data>
+                    <index>11</index>
+                    <position>[ 0.02411299944; -0.0469009988; 0.01507699955]</position>
+                    <normals>[ 0.0424680002; -0.9136919975; 0.4041830003]</normals>
+                </data>
+                <data>
+                    <index>12</index>
+                    <position>[ 0.01345700026; -0.04914300144; 0.004269999918]</position>
+                    <normals>[ -0.1088100001; -0.9940479994; -0.005336000118]</normals>
+                </data>
+                <data>
+                    <index>13</index>
+                    <position>[ -0.01466600038; -0.0375970006; -5.600000077e-05]</position>
+                    <normals>[ -0.5571150184; -0.8191779852; -0.1360819936]</normals>
+                </data>
+                <data>
+                    <index>14</index>
+                    <position>[ -0.02023000084; -0.03164200112; 0.01525500044]</position>
+                    <normals>[ -0.5296429992; -0.787225008; 0.3158389926]</normals>
+                </data>
+                <data>
+                    <index>15</index>
+                    <position>[ -0.03329300135; -0.02099700086; 0.002231999999]</position>
+                    <normals>[ -0.8292019963; -0.5555250049; -0.06177899987]</normals>
+                </data>
+            </handlerLedParam>
+            <ledBBoxPosition>
+                <data>[ -0.0352627486; 0.05222899839; -0.003704000032]</data>
+                <data>[ 0.06193425134; 0.05222899839; -0.003704000032]</data>
+                <data>[ -0.0352627486; 0.05222899839; 0.01688900031]</data>
+                <data>[ 0.06193425134; 0.05222899839; 0.01688900031]</data>
+                <data>[ -0.0352627486; -0.05154399946; -0.003704000032]</data>
+                <data>[ 0.06193425134; -0.05154399946; -0.003704000032]</data>
+                <data>[ -0.0352627486; -0.05154399946; 0.01688900031]</data>
+                <data>[ 0.06193425134; -0.05154399946; 0.01688900031]</data>
+            </ledBBoxPosition>
+            <reserved>[ 0; 0; 0]</reserved>
+            <imu1 name="st" version="">
+                <imuid>0</imuid>
+                <gFPS>250</gFPS>
+                <aFPS>250</aFPS>
+                <handlerDelayCam2IMU>-0.032</handlerDelayCam2IMU>
+                <gravityConstant>9.8</gravityConstant>
+                <needCompensate>1</needCompensate>
+                <gyroBias>[ -0.006876372706; -0.005786760315; -0.0008419210654]</gyroBias>
+                <gyroScale>[ 0.9986443846; 1.002010994; 0.9966276233]</gyroScale>
+                <gyroMisalign>[ -0.004813262302; 0.01264043092; 0.006186901175]</gyroMisalign>
+                <accelBias>[ 0.000394908611; 0.0181361013; -0.01008039631]</accelBias>
+                <accelScale>[ 1.000003491; 0.9899359636; 0.9987617667]</accelScale>
+                <accelMisalign>[ 0.00861593577; 0.0009614381482; -0.001266304304]</accelMisalign>
+                <gyro2accel>[ 0.002888289085; -0.00407492745; -0.001906230822; 0.9999857094]</gyro2accel>
+                <gyroNoiseSigma>0.000255</gyroNoiseSigma>
+                <accelNoiseSigma>0.003</accelNoiseSigma>
+                <gyroBiasSigma>3e-05</gyroBiasSigma>
+                <accelBiasSigma>0.00075</accelBiasSigma>
+                <extrinsicThi>[ 0.9043901153; -0.004242637503; 0.4266808416; -0.001994676038; -0.007939568736; 0.003784965863; 0.03608524371]</extrinsicThi>
+            </imu1>
+        </Handler2>
+    </Handler-Default>
+</models>
