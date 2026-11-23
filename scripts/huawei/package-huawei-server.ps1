@@ -101,7 +101,7 @@ New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 # and responsible for most of the size (a stale .pdb alone is ~50 MB).
 $excludedNames = @(
     '*.pdb', '*.bak', '*.bak_*', 'crash_log.txt', 'session_invalid.json',
-    'session_old.json', 'hmd_drivers.json', 'auto_vr_state.txt', '*.log', '*.bmp', '*.7z', '*.zip'
+    'session_old.json', 'hmd_drivers.json', 'auto_vr_state.txt', 'hw-assistant', '*.log', '*.bmp', '*.7z', '*.zip'
 )
 function Copy-TemplateTree {
     param([string]$Source, [string]$Destination)

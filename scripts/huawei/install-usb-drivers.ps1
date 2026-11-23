@@ -74,6 +74,43 @@ foreach ($inf in $infs) {
     & $pnputil /add-driver $inf.FullName /install 2>&1 | ForEach-Object { Write-Host "  $_" }
 }
 
+# --- Configure the official OpenVR driver's own data path -------------------
+# driver_huaweiVR.dll reads HKCU\SOFTWARE\HuaweiPCVRAssistant\Path and appends
+# \steamVRDriver\huaweiVR\bin\win64 to find VR6DOF.dll / SettingsPara. Without
+# it the driver loads but reports pNumDisplay=0 / HmdNotFound. We ship a copy
+# of the driver at <artifacts>\huawei-driver; stage it into that layout here.
+Write-Host ""
+Write-Host "=== configure official driver data path ===" -ForegroundColor Cyan
+$artifactDir = Split-Path -Parent $driverRoot
+if (-not (Test-Path -LiteralPath (Join-Path $artifactDir 'huawei-driver\driver.vrdrivermanifest') -PathType Leaf)) {
+    # script may live in scripts/huawei of the repo; find artifacts by manifest
+    $artifactDir = 'D:\PY\1\artifacts\HuaweiVRGlass-ALVR-Windows-v20.14.1'
+}
+$hdrRoot = Join-Path $artifactDir 'hw-assistant'
+$hdrExpected = Join-Path $hdrRoot 'steamVRDriver\huaweiVR'
+if (Test-Path -LiteralPath (Join-Path $artifactDir 'huawei-driver') -PathType Container) {
+    if (-not (Test-Path -LiteralPath (Join-Path $hdrExpected 'bin\win64\VR6DOF.dll') -PathType Leaf)) {
+        New-Item -ItemType Directory -Path (Split-Path -Parent $hdrExpected) -Force | Out-Null
+        Copy-Item -LiteralPath (Join-Path $artifactDir 'huawei-driver') -Destination $hdrExpected -Recurse -Force -ErrorAction SilentlyContinue | Out-Null
+    }
+    $regKey = 'HKCU:\SOFTWARE\HuaweiPCVRAssistant'
+    if (-not (Test-Path $regKey)) { New-Item -Path $regKey -Force | Out-Null }
+    $steamvrPath = 'D:\Program Files\Steam\steamapps\common\SteamVR'
+    foreach ($pair in @(
+        @('Path', $hdrRoot),
+        @('SteamVRInstalledPath', $steamvrPath),
+        @('SteamVrFirstRunningStatus', 'TRUE'),
+        @('XmlStatus', 'true'),
+        @('GetXmlData', 'true'),
+        @('DirectMode', 'true')
+    )) {
+        New-ItemProperty -Path $regKey -Name $pair[0] -Value $pair[1] -PropertyType String -Force | Out-Null
+    }
+    Write-Host "  registered driver Path = $hdrRoot" -ForegroundColor Green
+} else {
+    Write-Host "  huawei-driver not found under $artifactDir; skipped registry setup" -ForegroundColor Yellow
+}
+
 Write-Host ""
 Show-Devices 'after install'
 Write-Host ""
